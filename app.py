@@ -17,13 +17,23 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-product
 
 # Database configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "altpay.db")}'
+database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+if database_url:
+    # Support common Postgres URL formats on serverless hosts
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    # Local development fallback
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "altpay.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
 def _instance_key_path() -> str:
-    instance_dir = os.path.join(basedir, 'instance')
+    # On serverless (e.g., Vercel), the filesystem is read-only except /tmp.
+    base = '/tmp' if os.environ.get('VERCEL') else basedir
+    instance_dir = os.path.join(base, 'instance')
     os.makedirs(instance_dir, exist_ok=True)
     return os.path.join(instance_dir, 'fernet.key')
 
@@ -33,6 +43,13 @@ def _get_or_create_fernet_key() -> bytes:
     env_key = os.environ.get('APP_ENCRYPTION_KEY')
     if env_key:
         return env_key.encode('utf-8')
+
+    # On serverless, you should always provide APP_ENCRYPTION_KEY
+    if os.environ.get('VERCEL'):
+        raise RuntimeError(
+            'Missing APP_ENCRYPTION_KEY. Set it in Vercel environment variables '
+            '(Fernet key) to decrypt encrypted usernames/emails across invocations.'
+        )
 
     # Dev-friendly: persist key on disk so encrypted data remains readable
     key_path = _instance_key_path()
