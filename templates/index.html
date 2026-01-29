@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AltPay Shop</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="app-title">AltPay Shop</h1>
+
+        <!-- Create Product Section -->
+        <div class="card">
+            <h2 class="section-title">Create / Register Product</h2>
+            <form id="productForm" class="product-form">
+                <label for="productName">Product name</label>
+                <input type="text" id="productName" placeholder="e.g. Coffee" required>
+                
+                <label for="productPrice">Price</label>
+                <input type="number" id="productPrice" step="0.01" min="0.01" placeholder="e.g. 9.90" required>
+                
+                <button type="submit" class="btn btn-primary">Save product & generate QR</button>
+            </form>
+        </div>
+
+        <!-- Products List Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="section-title">Registered Products & QR Codes</h2>
+                <span class="badge">{{ products|length }}</span>
+            </div>
+            <div id="productsList">
+                {% if products %}
+                    {% for product in products %}
+                    <div class="product-row" data-product-id="{{ product.id }}">
+                        <div class="product-info">
+                            <div class="product-name">{{ product.name }}</div>
+                            <div class="product-price">${{ "%.2f"|format(product.price) }}</div>
+                            <button class="btn-small" onclick="addToCartFromList('{{ product.id }}')">
+                                Add to cart
+                            </button>
+                        </div>
+                        <div class="qr-container">
+                            <img src="{{ url_for('get_product_qr', product_id=product.id) }}" alt="QR Code" class="qr-image">
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="empty-text">No products yet. Register them above or preload from your backend.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Shopping Cart Section -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="section-title">Shopping Cart</h2>
+                <span class="badge">{{ cart|length }}</span>
+            </div>
+            <button class="btn btn-outline" onclick="openScanner()">Scan product QR Code</button>
+            
+            <div id="cartList">
+                {% if cart %}
+                    {% for item in cart %}
+                    <div class="cart-row">
+                        <span class="cart-name">{{ item.name }}</span>
+                        <span class="cart-price">${{ "%.2f"|format(item.price) }}</span>
+                    </div>
+                    {% endfor %}
+                    <div class="cart-total-row">
+                        <span class="cart-total-label">Total</span>
+                        <span class="cart-total-value">${{ "%.2f"|format(cart_total) }}</span>
+                    </div>
+                {% else %}
+                    <p class="empty-text">Your cart is empty. Scan a product QR Code or tap "Add to cart" on a product.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div id="scannerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Scan Product QR Code</h2>
+                <button class="close-btn" onclick="closeScanner()">&times;</button>
+            </div>
+            <div class="scanner-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+            </div>
+            <p id="scannerStatus" class="scanner-status">Point camera at QR code...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
