@@ -28,3 +28,9 @@ Thumbs.db
 
 # Session files (if using file-based sessions)
 flask_session/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+altpay.db
