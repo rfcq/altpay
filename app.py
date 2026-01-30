@@ -465,7 +465,13 @@ def add_product():
 
 def _parse_import_row(row):
     """Normalize a dict row to name/price. Accepts name, nome, price, preco (case-insensitive)."""
-    key_map = {k.lower().strip(): k for k in row}
+    key_map = {}
+    for k in row:
+        if k is None:
+            continue
+        s = (k if isinstance(k, str) else str(k)).strip()
+        if s:
+            key_map[s.lower()] = k
     name_key = next((key_map[k] for k in ('name', 'nome', 'product', 'produto') if k in key_map), None)
     price_key = next((key_map[k] for k in ('price', 'preco', 'preço') if k in key_map), None)
     if not name_key or not price_key:
