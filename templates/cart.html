@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Cart – AltPay Shop{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="section-title">Cart</h2>
+            <span class="badge">{{ cart|length }}</span>
+        </div>
+        <button type="button" class="btn btn-outline" onclick="openScanner()">Scan QR Code</button>
+        <div id="cartList">
+            {% if cart %}
+            {% for item in cart %}
+            <div class="cart-row"><span class="cart-name">{{ item.name }}</span><span class="cart-price">${{ "%.2f"|format(item.price) }}</span></div>
+            {% endfor %}
+            <div class="cart-total-row"><span class="cart-total-label">Total</span><span class="cart-total-value">${{ "%.2f"|format(cart_total) }}</span></div>
+            <button type="button" class="btn btn-primary" onclick="preparePrintFromCart()" style="margin-top:12px">Print Cart</button>
+            <button type="button" class="btn btn-danger" onclick="clearCart()" style="margin-top:8px">Clear Cart</button>
+            {% else %}
+            <p class="empty-text">Cart is empty. Scan a QR or add from <a href="{{ url_for('products') }}">Products</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div id="printModal" class="modal">
+    <div class="modal-content print-modal-content">
+        <div class="print-header"><h2>Print Preview</h2><div class="print-actions"><button type="button" class="btn btn-primary" onclick="window.print()">Print</button><button type="button" class="btn btn-outline" onclick="closePrintModal()">Close</button></div></div>
+        <div id="printContent" class="print-content"></div>
+    </div>
+</div>
+
+<div id="scannerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><h2>Scan QR Code</h2><button type="button" class="close-btn" onclick="closeScanner()">&times;</button></div>
+        <div class="scanner-container">
+            <video id="video" autoplay playsinline webkit-playsinline muted></video>
+            <canvas id="canvas" style="display:none"></canvas>
+            <div class="scanner-overlay-ui"><div class="scanner-frame"></div><button id="switchCameraBtn" type="button" class="camera-switch-btn" onclick="switchCamera()" title="Switch camera" style="display:none">&#8634;</button></div>
+        </div>
+        <p id="scannerStatus" class="scanner-status">Point camera at QR code...</p>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+{{ super() }}
+{% endblock %}

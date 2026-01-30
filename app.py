@@ -291,10 +291,28 @@ def logout():
 @app.route('/')
 @login_required
 def index():
+    return redirect(url_for('products'))
+
+
+@app.route('/create')
+@login_required
+def create_product_page():
+    return render_template('create_product.html', username=session.get('username'))
+
+
+@app.route('/products')
+@login_required
+def products():
+    products_list = [p.to_dict() for p in Product.query.all()]
+    return render_template('products.html', products=products_list, username=session.get('username'))
+
+
+@app.route('/cart')
+@login_required
+def cart_page():
     cart = session.get('cart', [])
     cart_total = sum(item['price'] for item in cart)
-    products = [p.to_dict() for p in Product.query.all()]
-    return render_template('index.html', products=products, cart=cart, cart_total=cart_total, username=session.get('username'))
+    return render_template('cart.html', cart=cart, cart_total=cart_total, username=session.get('username'))
 
 
 @app.route('/api/products', methods=['POST'])

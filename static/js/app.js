@@ -2,16 +2,25 @@ let stream=null,isScanning=false,lastScannedCode=null,currentFacingMode='environ
 function isIOS(){return/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
 function getVideoConstraints(){return isIOS()?{video:{facingMode:{ideal:currentFacingMode},width:{min:320},height:{min:240}},audio:false}:{video:{facingMode:currentFacingMode,width:{ideal:1280},height:{ideal:720}},audio:false};}
 
-document.getElementById('productForm').addEventListener('submit',async function(e){
-  e.preventDefault();
-  const name=document.getElementById('productName').value.trim(),price=parseFloat(document.getElementById('productPrice').value);
-  if(!name||isNaN(price)||price<=0){alert('Enter valid name and price');return;}
-  try{
-    const r=await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
-    if(r.ok)location.reload();else{const d=await r.json();alert(d.error||'Failed');}
-  }catch(err){alert('Failed');}
-  this.reset();
-});
+(function sidebarToggle(){
+  var btn=document.getElementById('sidebarToggle'),sidebar=document.getElementById('sidebar'),overlay=document.getElementById('sidebarOverlay');
+  function toggle(){var open=sidebar.classList.toggle('open');btn.classList.toggle('sidebar-open',open);if(overlay)overlay.classList.toggle('visible',open);}
+  if(btn&&sidebar){btn.addEventListener('click',toggle);if(overlay)overlay.addEventListener('click',function(){sidebar.classList.remove('open');btn.classList.remove('sidebar-open');overlay.classList.remove('visible');});}
+})();
+
+var productForm=document.getElementById('productForm');
+if(productForm){
+  productForm.addEventListener('submit',async function(e){
+    e.preventDefault();
+    const name=document.getElementById('productName').value.trim(),price=parseFloat(document.getElementById('productPrice').value);
+    if(!name||isNaN(price)||price<=0){alert('Enter valid name and price');return;}
+    try{
+      const r=await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
+      if(r.ok)window.location.href='/products';else{const d=await r.json();alert(d.error||'Failed');}
+    }catch(err){alert('Failed');}
+    this.reset();
+  });
+}
 
 async function addToCartFromList(productId){
   try{
@@ -29,25 +38,25 @@ async function clearCart(){
 }
 
 function openEditModal(id,name,price){
-  document.getElementById('editProductId').value=id;
-  document.getElementById('editProductName').value=name;
-  document.getElementById('editProductPrice').value=price;
-  document.getElementById('editProductModal').classList.add('active');
+  var m=document.getElementById('editProductModal'),f=document.getElementById('editProductForm');
+  if(m&&f){document.getElementById('editProductId').value=id;document.getElementById('editProductName').value=name;document.getElementById('editProductPrice').value=price;m.classList.add('active');}
 }
 function closeEditModal(){
-  document.getElementById('editProductModal').classList.remove('active');
-  document.getElementById('editProductForm').reset();
+  var m=document.getElementById('editProductModal'),f=document.getElementById('editProductForm');
+  if(m){m.classList.remove('active');}if(f){f.reset();}
 }
-
-document.getElementById('editProductForm').addEventListener('submit',async function(e){
-  e.preventDefault();
-  const id=document.getElementById('editProductId').value,name=document.getElementById('editProductName').value.trim(),price=parseFloat(document.getElementById('editProductPrice').value);
-  if(!name||isNaN(price)||price<=0){alert('Invalid');return;}
-  try{
-    const r=await fetch('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
-    if(r.ok){closeEditModal();location.reload();}else{alert((await r.json()).error||'Failed');}
-  }catch(e){alert('Failed');}
-});
+var editProductForm=document.getElementById('editProductForm');
+if(editProductForm){
+  editProductForm.addEventListener('submit',async function(e){
+    e.preventDefault();
+    const id=document.getElementById('editProductId').value,name=document.getElementById('editProductName').value.trim(),price=parseFloat(document.getElementById('editProductPrice').value);
+    if(!name||isNaN(price)||price<=0){alert('Invalid');return;}
+    try{
+      const r=await fetch('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
+      if(r.ok){closeEditModal();location.reload();}else{alert((await r.json()).error||'Failed');}
+    }catch(e){alert('Failed');}
+  });
+}
 
 async function deleteProduct(productId,productName){
   if(!confirm('Delete "'+productName+'"?'))return;
@@ -58,7 +67,9 @@ async function deleteProduct(productId,productName){
 }
 
 function toggleSelectAll(){
-  const all=document.getElementById('selectAllProducts').checked;
+  var sel=document.getElementById('selectAllProducts');
+  if(!sel)return;
+  const all=sel.checked;
   document.querySelectorAll('.product-checkbox-input').forEach(cb=>cb.checked=all);
   updateBulkDeleteButton();
 }
@@ -121,10 +132,13 @@ function openPrintModal(items,title){
 function closePrintModal(){document.getElementById('printModal').classList.remove('active');}
 function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 
-document.getElementById('editProductModal').addEventListener('click',e=>{if(e.target.id==='editProductModal')closeEditModal();});
-document.getElementById('printModal').addEventListener('click',e=>{if(e.target.id==='printModal')closePrintModal();});
+var editProductModal=document.getElementById('editProductModal');
+if(editProductModal)editProductModal.addEventListener('click',e=>{if(e.target.id==='editProductModal')closeEditModal();});
+var printModal=document.getElementById('printModal');
+if(printModal)printModal.addEventListener('click',e=>{if(e.target.id==='printModal')closePrintModal();});
 
 function openScanner(){
+  if(!document.getElementById('scannerModal'))return;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){alert('Camera not supported');return;}
   document.getElementById('scannerModal').classList.add('active');
   document.body.style.overflow='hidden';
@@ -189,4 +203,5 @@ async function handleScannedQR(data){
     else{document.getElementById('scannerStatus').textContent='Failed';document.getElementById('scannerStatus').className='scanner-status error';setTimeout(()=>{isScanning=true;document.getElementById('scannerStatus').textContent='Point at QR code...';},2000);}
   }catch(e){document.getElementById('scannerStatus').textContent='Invalid QR';document.getElementById('scannerStatus').className='scanner-status error';setTimeout(()=>{isScanning=true;document.getElementById('scannerStatus').textContent='Point at QR code...';},2000);}
 }
-document.getElementById('scannerModal').addEventListener('click',e=>{if(e.target.id==='scannerModal')closeScanner();});
+var scannerModal=document.getElementById('scannerModal');
+if(scannerModal)scannerModal.addEventListener('click',e=>{if(e.target.id==='scannerModal')closeScanner();});

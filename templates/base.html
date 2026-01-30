@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AltPay Shop{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <span class="sidebar-toggle-icon"></span>
+    </button>
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1 class="sidebar-title">AltPay Shop</h1>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('create_product_page') }}" class="sidebar-link {% if request.endpoint == 'create_product_page' %}active{% endif %}">Create Product</a>
+            <a href="{{ url_for('products') }}" class="sidebar-link {% if request.endpoint == 'products' %}active{% endif %}">Products</a>
+            <a href="{{ url_for('cart_page') }}" class="sidebar-link {% if request.endpoint == 'cart_page' %}active{% endif %}">Cart</a>
+        </nav>
+    </aside>
+    <div class="main-wrap">
+        <header class="header-bar">
+            <div class="user-info">
+                <span class="username">Welcome, {{ username }}!</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-small logout-btn">Logout</a>
+            </div>
+        </header>
+        <main class="main-content">
+            {% if use_ephemeral_db %}
+                <div class="flash-message flash-error" role="alert">Data is not persistent on this deployment (no database). Add <code>DATABASE_URL</code> for persistent storage. See VERCEL.md.</div>
+            {% endif %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% block modals %}{% endblock %}
+    {% block scripts %}
+        <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% endblock %}
+</body>
+</html>
