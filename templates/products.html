@@ -23,9 +23,7 @@
                     <div class="product-actions">
                         <button type="button" class="btn-small" onclick="addToCartFromList('{{ product.id }}')">{{ strings.add_to_cart }}</button>
                         <button type="button" class="btn-small btn-edit" onclick="openEditModal('{{ product.id }}', {{ product.name|tojson }}, {{ product.price }})">{{ strings.edit }}</button>
-                        {% if product.id not in ['1','2','3'] %}
                         <button type="button" class="btn-small btn-danger" onclick="deleteProduct('{{ product.id }}', {{ product.name|tojson }})">{{ strings.delete }}</button>
-                        {% endif %}
                     </div>
                 </div>
                 <div class="qr-container"><img src="{{ url_for('get_product_qr', product_id=product.id) }}" alt="QR" class="qr-image"></div>

@@ -234,16 +234,12 @@ def init_db():
 
         try:
             db.create_all()
-            if Product.query.count() == 0:
-                for p in [Product(id='1', name='Latte', price=4.5), Product(id='2', name='Cappuccino', price=5.2), Product(id='3', name='Espresso', price=3.0)]:
-                    db.session.add(p)
-                db.session.commit()
         except OperationalError as e:
             app.logger.warning(f"Database not available: {e}")
             db.session.rollback()
         except Exception as e:
             db.session.rollback()
-            app.logger.warning(f"Default products: {e}")
+            app.logger.warning(f"create_all: {e}")
 
 
 _db_initialized = False
@@ -492,8 +488,6 @@ def delete_product(product_id):
     product = Product.query.get(product_id)
     if not product:
         return jsonify({'error': _t('err_product_not_found')}), 404
-    if product.id in ('1', '2', '3'):
-        return jsonify({'error': _t('err_cannot_delete_default')}), 400
     db.session.delete(product)
     db.session.commit()
     return jsonify({'message': _t('msg_product_deleted')}), 200
@@ -506,7 +500,6 @@ def bulk_delete_products():
     product_ids = data.get('product_ids') or []
     if not isinstance(product_ids, list):
         return jsonify({'error': _t('err_invalid_product_ids')}), 400
-    product_ids = [p for p in product_ids if p not in ('1', '2', '3')]
     if not product_ids:
         return jsonify({'error': _t('err_no_valid_products')}), 400
     products = Product.query.filter(Product.id.in_(product_ids)).all()
