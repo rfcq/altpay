@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from cryptography.fernet import Fernet
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 import hashlib
 import qrcode
 import io
@@ -129,6 +130,9 @@ class Product(db.Model):
 def init_db():
     with app.app_context():
         try:
+            # Avoid connecting on Vercel when no DATABASE_URL (SQLite would fail)
+            if os.environ.get('VERCEL') and not (os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')):
+                return
             inspector = inspect(db.engine)
             if 'user' in inspector.get_table_names():
                 cols = {c['name'] for c in inspector.get_columns('user')}
@@ -163,12 +167,15 @@ def init_db():
         except Exception as e:
             app.logger.warning(f"Migration check failed: {e}")
 
-        db.create_all()
         try:
+            db.create_all()
             if Product.query.count() == 0:
                 for p in [Product(id='1', name='Latte', price=4.5), Product(id='2', name='Cappuccino', price=5.2), Product(id='3', name='Espresso', price=3.0)]:
                     db.session.add(p)
                 db.session.commit()
+        except OperationalError as e:
+            app.logger.warning(f"Database not available: {e}")
+            db.session.rollback()
         except Exception as e:
             db.session.rollback()
             app.logger.warning(f"Default products: {e}")
@@ -190,8 +197,17 @@ def login_required(f):
 def before_request():
     global _db_initialized
     if not _db_initialized:
-        init_db()
-        _db_initialized = True
+        # On Vercel, skip DB init if no DATABASE_URL (SQLite can't be used; would fail at connect)
+        if os.environ.get('VERCEL') and not (os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')):
+            _db_initialized = True
+        else:
+            try:
+                init_db()
+            except Exception as e:
+                app.logger.warning(f"init_db failed: {e}")
+                _db_initialized = True  # avoid retrying on every request
+            else:
+                _db_initialized = True
     if 'cart' not in session:
         session['cart'] = []
 
