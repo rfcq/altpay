@@ -469,7 +469,7 @@ def _parse_import_row(row):
     for k in row:
         if k is None:
             continue
-        s = (k if isinstance(k, str) else str(k)).strip()
+        s = (k if isinstance(k, str) else str(k)).strip().lstrip('\ufeff')
         if s:
             key_map[s.lower()] = k
     name_key = next((key_map[k] for k in ('name', 'nome', 'product', 'produto') if k in key_map), None)
@@ -503,22 +503,31 @@ def import_products():
         content = f.read()
         if isinstance(content, bytes):
             content = content.decode('utf-8', errors='replace')
+        if content.startswith('\ufeff'):
+            content = content[1:]
         created = 0
         errors = []
         user_id = session.get('user_id')
         if fn.endswith('.csv'):
-            reader = csv.DictReader(io.StringIO(content), delimiter=',')
-            if not reader.fieldnames:
-                return jsonify({'error': _t('import_empty')}), 400
-            for i, row in enumerate(reader):
-                name, price = _parse_import_row(row)
-                if name is None and price is None:
+            for delimiter in (';', ','):
+                reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
+                if not reader.fieldnames:
                     continue
-                if price is None:
-                    errors.append(_t('import_row_invalid', row=i + 2))
+                if len(reader.fieldnames) < 2:
                     continue
-                db.session.add(Product(id=str(uuid.uuid4()), name=name, price=price, user_id=user_id))
-                created += 1
+                rows = list(reader)
+                if not rows:
+                    continue
+                for i, row in enumerate(rows):
+                    name, price = _parse_import_row(row)
+                    if name is None and price is None:
+                        continue
+                    if price is None:
+                        errors.append(_t('import_row_invalid', row=i + 2))
+                        continue
+                    db.session.add(Product(id=str(uuid.uuid4()), name=name, price=price, user_id=user_id))
+                    created += 1
+                break
         else:
             data = json.loads(content)
             if isinstance(data, dict) and 'products' in data:
