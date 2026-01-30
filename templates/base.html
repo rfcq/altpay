@@ -19,6 +19,9 @@
             <a href="{{ url_for('create_product_page') }}" class="sidebar-link {% if request.endpoint == 'create_product_page' %}active{% endif %}">Create Product</a>
             <a href="{{ url_for('products') }}" class="sidebar-link {% if request.endpoint == 'products' %}active{% endif %}">Products</a>
             <a href="{{ url_for('cart_page') }}" class="sidebar-link {% if request.endpoint == 'cart_page' %}active{% endif %}">Cart</a>
+            {% if is_admin %}
+            <a href="{{ url_for('users_page') }}" class="sidebar-link {% if request.endpoint == 'users_page' %}active{% endif %}">Users</a>
+            {% endif %}
         </nav>
     </aside>
     <div class="main-wrap">

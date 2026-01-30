@@ -49,7 +49,16 @@ def _is_ephemeral_db():
 
 @app.context_processor
 def inject_ephemeral_db_warning():
-    return {'use_ephemeral_db': _is_ephemeral_db()}
+    out = {'use_ephemeral_db': _is_ephemeral_db()}
+    if 'user_id' in session:
+        try:
+            user = User.query.get(session['user_id'])
+            out['is_admin'] = user.is_admin if user else False
+        except Exception:
+            out['is_admin'] = False
+    else:
+        out['is_admin'] = False
+    return out
 
 
 def _instance_key_path():
@@ -98,6 +107,10 @@ def _decrypt_str(token):
     return _FERNET.decrypt(token).decode('utf-8')
 
 
+ROLE_USER = 'user'
+ROLE_ADMIN = 'admin'
+
+
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -106,7 +119,12 @@ class User(db.Model):
     email_enc = db.Column(db.LargeBinary, nullable=False)
     email_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default=ROLE_USER)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def is_admin(self):
+        return self.role == ROLE_ADMIN
 
     @property
     def username(self):
@@ -180,6 +198,14 @@ def init_db():
                         conn.execute(text("ALTER TABLE user_new RENAME TO user"))
                         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_username_hash ON user (username_hash)"))
                         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_email_hash ON user (email_hash)"))
+            if 'role' not in cols:
+                try:
+                    dialect = db.engine.dialect.name
+                    table = '"user"' if dialect == 'postgresql' else 'user'
+                    with db.engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN role VARCHAR(20) DEFAULT 'user' NOT NULL"))
+                except Exception as alter_err:
+                    app.logger.warning(f"Role column migration: {alter_err}")
         except Exception as e:
             app.logger.warning(f"Migration check failed: {e}")
 
@@ -209,6 +235,22 @@ def login_required(f):
     return decorated_function
 
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        try:
+            user = User.query.get(session['user_id'])
+            if not user or user.role != ROLE_ADMIN:
+                flash('Admin access required', 'error')
+                return redirect(url_for('products'))
+        except Exception:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 @app.before_request
 def before_request():
     global _db_initialized
@@ -228,37 +270,59 @@ def before_request():
         session['cart'] = []
 
 
+def _register_allowed():
+    """Allow register if no users exist (bootstrap first admin) or current user is admin."""
+    if User.query.count() == 0:
+        return True
+    if 'user_id' not in session:
+        return False
+    user = User.query.get(session['user_id'])
+    return user and user.role == ROLE_ADMIN
+
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if request.method == 'GET':
+        if not _register_allowed():
+            if 'user_id' in session:
+                flash('Only admins can add new users.', 'error')
+                return redirect(url_for('products'))
+            flash('Contact an administrator for an account.', 'info')
+            return redirect(url_for('login'))
+        return render_template('register.html', is_first_user=User.query.count() == 0)
     if request.method == 'POST':
+        if not _register_allowed():
+            flash('Only admins can add new users.', 'error')
+            return redirect(url_for('login'))
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
         if not username or not email or not password:
             flash('All fields are required', 'error')
-            return render_template('register.html')
+            return render_template('register.html', is_first_user=User.query.count() == 0)
         if password != confirm:
             flash('Passwords do not match', 'error')
-            return render_template('register.html')
+            return render_template('register.html', is_first_user=User.query.count() == 0)
         if len(password) < 6:
             flash('Password must be at least 6 characters', 'error')
-            return render_template('register.html')
+            return render_template('register.html', is_first_user=User.query.count() == 0)
         if User.query.filter_by(username_hash=_username_hash(username)).first():
             flash('Username already exists', 'error')
-            return render_template('register.html')
+            return render_template('register.html', is_first_user=User.query.count() == 0)
         if User.query.filter_by(email_hash=_email_hash(email)).first():
             flash('Email already registered', 'error')
-            return render_template('register.html')
+            return render_template('register.html', is_first_user=User.query.count() == 0)
         user = User()
         user.set_username(username)
         user.set_email(email)
         user.set_password(password)
+        user.role = ROLE_ADMIN if User.query.count() == 0 else ROLE_USER
         db.session.add(user)
         db.session.commit()
-        flash('Registration successful! Please login.', 'success')
-        return redirect(url_for('login'))
-    return render_template('register.html')
+        is_first = User.query.count() == 1
+        flash('Registration successful! Please login.' if is_first else 'User created. They can log in now.', 'success')
+        return redirect(url_for('login') if is_first else url_for('users_page'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -273,6 +337,7 @@ def login():
         if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
+            session['role'] = user.role
             flash(f'Welcome back, {user.username}!', 'success')
             return redirect(url_for('index'))
         flash('Invalid username or password', 'error')
@@ -313,6 +378,15 @@ def cart_page():
     cart = session.get('cart', [])
     cart_total = sum(item['price'] for item in cart)
     return render_template('cart.html', cart=cart, cart_total=cart_total, username=session.get('username'))
+
+
+@app.route('/users')
+@login_required
+@admin_required
+def users_page():
+    users_list = User.query.order_by(User.created_at.desc()).all()
+    users_data = [{'id': u.id, 'username': u.username, 'role': u.role, 'created_at': u.created_at} for u in users_list]
+    return render_template('users.html', users=users_data, username=session.get('username'))
 
 
 @app.route('/api/products', methods=['POST'])

@@ -57,6 +57,16 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f4f4fb;color:#11
 .qr-container{width:70px;height:70px;display:flex;align-items:center;justify-content:center;background:#f9fafb;border-radius:8px}
 .qr-image{width:60px;height:60px}
 .empty-text{font-size:14px;color:#9ca3af;margin-top:8px}
+.empty-text a{color:#4f46e5;text-decoration:none;font-weight:500}
+.empty-text a:hover{text-decoration:underline}
+.text-muted{font-size:14px;color:#6b7280}
+.table-wrap{overflow-x:auto;margin-top:8px}
+.users-table{width:100%;border-collapse:collapse;font-size:14px}
+.users-table th,.users-table td{padding:10px 12px;text-align:left;border-bottom:1px solid #f3f4f6}
+.users-table th{font-weight:600;color:#374151;background:#f9fafb}
+.role-badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.role-badge.role-admin{background:#dbeafe;color:#1e40af}
+.role-badge.role-user{background:#f3f4f6;color:#4b5563}
 .cart-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6}
 .cart-name{font-size:15px;color:#111}
 .cart-price{font-size:15px;font-weight:500;color:#111}

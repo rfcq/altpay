@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Users – AltPay Shop{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="section-title">Users</h2>
+            <a href="{{ url_for('register') }}" class="btn btn-primary">Add user</a>
+        </div>
+        <p class="text-muted" style="margin-bottom:12px;font-size:14px;color:#6b7280">Only admins can add new users. New accounts can log in after you create them.</p>
+        {% if users %}
+        <div class="table-wrap">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>{{ u.username }}</td>
+                        <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
+                        <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="empty-text">No users yet. <a href="{{ url_for('register') }}">Add the first user</a> (they will be admin).</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

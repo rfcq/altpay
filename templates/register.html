@@ -11,7 +11,10 @@
     <div class="auth-container">
         <div class="auth-card">
             <h1 class="auth-title">AltPay Shop</h1>
-            <h2 class="auth-subtitle">Register</h2>
+            <h2 class="auth-subtitle">{% if is_first_user %}Create first admin account{% else %}Add new user{% endif %}</h2>
+            {% if is_first_user %}
+                <p class="text-muted" style="margin-bottom:1rem;font-size:14px;color:#6b7280">No users exist yet. This account will be the administrator.</p>
+            {% endif %}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
