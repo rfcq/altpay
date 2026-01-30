@@ -1,3 +1,6 @@
+"""
+AltPay - Flask app with auth, products, QR codes, and shopping cart.
+"""
 from flask import Flask, render_template, request, jsonify, session, send_file, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -15,48 +18,40 @@ import os
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 
-# Database configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
 database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
 if database_url:
-    # Support common Postgres URL formats on serverless hosts
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # Local development fallback
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "altpay.db")}'
+    if os.environ.get('VERCEL'):
+        db_path = '/tmp/altpay.db'
+    else:
+        db_path = os.path.join(basedir, 'altpay.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-def _instance_key_path() -> str:
-    # On serverless (e.g., Vercel), the filesystem is read-only except /tmp.
+
+def _instance_key_path():
     base = '/tmp' if os.environ.get('VERCEL') else basedir
     instance_dir = os.path.join(base, 'instance')
     os.makedirs(instance_dir, exist_ok=True)
     return os.path.join(instance_dir, 'fernet.key')
 
 
-def _get_or_create_fernet_key() -> bytes:
-    # Prefer env var (useful for production deployments)
+def _get_or_create_fernet_key():
     env_key = os.environ.get('APP_ENCRYPTION_KEY')
     if env_key:
         return env_key.encode('utf-8')
-
-    # On serverless, you should always provide APP_ENCRYPTION_KEY
     if os.environ.get('VERCEL'):
-        raise RuntimeError(
-            'Missing APP_ENCRYPTION_KEY. Set it in Vercel environment variables '
-            '(Fernet key) to decrypt encrypted usernames/emails across invocations.'
-        )
-
-    # Dev-friendly: persist key on disk so encrypted data remains readable
+        raise RuntimeError('Missing APP_ENCRYPTION_KEY. Set it in Vercel environment variables.')
     key_path = _instance_key_path()
     if os.path.exists(key_path):
         with open(key_path, 'rb') as f:
             return f.read().strip()
-
     key = Fernet.generate_key()
     with open(key_path, 'wb') as f:
         f.write(key)
@@ -66,35 +61,29 @@ def _get_or_create_fernet_key() -> bytes:
 _FERNET = Fernet(_get_or_create_fernet_key())
 
 
-def _normalize_username(username: str) -> str:
-    return username.strip().lower()
-
-
-def _username_hash(username: str) -> str:
-    # Deterministic hash for lookup + uniqueness; peppered with SECRET_KEY
+def _username_hash(username):
     pepper = app.secret_key or ''
-    normalized = _normalize_username(username)
+    normalized = username.strip().lower()
     return hashlib.sha256(f'{pepper}:{normalized}'.encode('utf-8')).hexdigest()
 
 
-def _email_hash(email: str) -> str:
+def _email_hash(email):
     pepper = app.secret_key or ''
     normalized = email.strip().lower()
     return hashlib.sha256(f'{pepper}:{normalized}'.encode('utf-8')).hexdigest()
 
 
-def _encrypt_str(value: str) -> bytes:
+def _encrypt_str(value):
     return _FERNET.encrypt(value.encode('utf-8'))
 
 
-def _decrypt_str(token: bytes) -> str:
+def _decrypt_str(token):
     return _FERNET.decrypt(token).decode('utf-8')
 
 
-# User model
 class User(db.Model):
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
-    # Encrypted-at-rest fields + deterministic hashes for lookup/uniqueness
     username_enc = db.Column(db.LargeBinary, nullable=False)
     username_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
     email_enc = db.Column(db.LargeBinary, nullable=False)
@@ -103,34 +92,30 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property
-    def username(self) -> str:
+    def username(self):
         return _decrypt_str(self.username_enc)
 
     @property
-    def email(self) -> str:
+    def email(self):
         return _decrypt_str(self.email_enc)
 
-    def set_username(self, username: str) -> None:
+    def set_username(self, username):
         self.username_enc = _encrypt_str(username.strip())
         self.username_hash = _username_hash(username)
 
-    def set_email(self, email: str) -> None:
+    def set_email(self, email):
         self.email_enc = _encrypt_str(email.strip())
         self.email_hash = _email_hash(email)
 
     def set_password(self, password):
-        # Passwords should be hashed (one-way), not encrypted (reversible)
         self.password_hash = generate_password_hash(password, method='scrypt')
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    def __repr__(self):
-        return f'<User {self.username_hash}>'
 
-
-# Product model
 class Product(db.Model):
+    __tablename__ = 'product'
     id = db.Column(db.String(36), primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     price = db.Column(db.Float, nullable=False)
@@ -138,79 +123,60 @@ class Product(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'price': self.price
-        }
+        return {'id': self.id, 'name': self.name, 'price': self.price}
 
 
-# Create tables
-with app.app_context():
-    # Lightweight migration from old schema (username/email plaintext) to new encrypted schema
-    inspector = inspect(db.engine)
-    if 'user' in inspector.get_table_names():
-        cols = {c['name'] for c in inspector.get_columns('user')}
-        if 'username' in cols and 'username_enc' not in cols:
-            with db.engine.begin() as conn:
-                # Create a new table with the new schema
-                conn.execute(
-                    text(
-                        """
-                        CREATE TABLE IF NOT EXISTS user_new (
-                            id INTEGER PRIMARY KEY,
-                            username_enc BLOB NOT NULL,
-                            username_hash VARCHAR(64) NOT NULL UNIQUE,
-                            email_enc BLOB NOT NULL,
-                            email_hash VARCHAR(64) NOT NULL UNIQUE,
-                            password_hash VARCHAR(255) NOT NULL,
-                            created_at DATETIME
-                        )
-                        """
-                    )
-                )
-                rows = conn.execute(
-                    text("SELECT id, username, email, password_hash, created_at FROM user")
-                ).fetchall()
-                for r in rows:
-                    conn.execute(
-                        text(
-                            """
-                            INSERT INTO user_new
-                                (id, username_enc, username_hash, email_enc, email_hash, password_hash, created_at)
-                            VALUES
-                                (:id, :username_enc, :username_hash, :email_enc, :email_hash, :password_hash, :created_at)
-                            """
-                        ),
-                        {
-                            'id': r[0],
-                            'username_enc': _encrypt_str(r[1]),
-                            'username_hash': _username_hash(r[1]),
-                            'email_enc': _encrypt_str(r[2]),
-                            'email_hash': _email_hash(r[2]),
-                            'password_hash': r[3],
-                            'created_at': r[4],
-                        },
-                    )
-                conn.execute(text("DROP TABLE user"))
-                conn.execute(text("ALTER TABLE user_new RENAME TO user"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_username_hash ON user (username_hash)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_email_hash ON user (email_hash)"))
+def init_db():
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if 'user' in inspector.get_table_names():
+                cols = {c['name'] for c in inspector.get_columns('user')}
+                if 'username' in cols and 'username_enc' not in cols:
+                    with db.engine.begin() as conn:
+                        conn.execute(text("""
+                            CREATE TABLE IF NOT EXISTS user_new (
+                                id INTEGER PRIMARY KEY,
+                                username_enc BLOB NOT NULL,
+                                username_hash VARCHAR(64) NOT NULL UNIQUE,
+                                email_enc BLOB NOT NULL,
+                                email_hash VARCHAR(64) NOT NULL UNIQUE,
+                                password_hash VARCHAR(255) NOT NULL,
+                                created_at DATETIME
+                            )
+                        """))
+                        rows = conn.execute(text(
+                            "SELECT id, username, email, password_hash, created_at FROM user"
+                        )).fetchall()
+                        for r in rows:
+                            conn.execute(text("""
+                                INSERT INTO user_new (id, username_enc, username_hash, email_enc, email_hash, password_hash, created_at)
+                                VALUES (:id, :ue, :uh, :ee, :eh, :ph, :ca)
+                            """), {
+                                'id': r[0], 'ue': _encrypt_str(r[1]), 'uh': _username_hash(r[1]),
+                                'ee': _encrypt_str(r[2]), 'eh': _email_hash(r[2]), 'ph': r[3], 'ca': r[4],
+                            })
+                        conn.execute(text("DROP TABLE user"))
+                        conn.execute(text("ALTER TABLE user_new RENAME TO user"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_username_hash ON user (username_hash)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_email_hash ON user (email_hash)"))
+        except Exception as e:
+            app.logger.warning(f"Migration check failed: {e}")
 
-    db.create_all()
-    # Add default products if they don't exist
-    if Product.query.count() == 0:
-        default_products = [
-            Product(id='1', name='Latte', price=4.5),
-            Product(id='2', name='Cappuccino', price=5.2),
-            Product(id='3', name='Espresso', price=3.0),
-        ]
-        for product in default_products:
-            db.session.add(product)
-        db.session.commit()
+        db.create_all()
+        try:
+            if Product.query.count() == 0:
+                for p in [Product(id='1', name='Latte', price=4.5), Product(id='2', name='Cappuccino', price=5.2), Product(id='3', name='Espresso', price=3.0)]:
+                    db.session.add(p)
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.warning(f"Default products: {e}")
 
 
-# Authentication decorator
+_db_initialized = False
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -221,54 +187,45 @@ def login_required(f):
 
 
 @app.before_request
-def initialize_session():
-    """Initialize cart in session if it doesn't exist"""
+def before_request():
+    global _db_initialized
+    if not _db_initialized:
+        init_db()
+        _db_initialized = True
     if 'cart' not in session:
         session['cart'] = []
 
 
-# Auth routes
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-
-        # Validation
+        confirm = request.form.get('confirm_password', '')
         if not username or not email or not password:
             flash('All fields are required', 'error')
             return render_template('register.html')
-
-        if password != confirm_password:
+        if password != confirm:
             flash('Passwords do not match', 'error')
             return render_template('register.html')
-
         if len(password) < 6:
-            flash('Password must be at least 6 characters long', 'error')
+            flash('Password must be at least 6 characters', 'error')
             return render_template('register.html')
-
-        # Check if user already exists
         if User.query.filter_by(username_hash=_username_hash(username)).first():
             flash('Username already exists', 'error')
             return render_template('register.html')
-
         if User.query.filter_by(email_hash=_email_hash(email)).first():
             flash('Email already registered', 'error')
             return render_template('register.html')
-
-        # Create new user
         user = User()
         user.set_username(username)
         user.set_email(email)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-
         flash('Registration successful! Please login.', 'success')
         return redirect(url_for('login'))
-
     return render_template('register.html')
 
 
@@ -277,22 +234,17 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-
         if not username or not password:
             flash('Please enter both username and password', 'error')
             return render_template('login.html')
-
         user = User.query.filter_by(username_hash=_username_hash(username)).first()
-
         if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
             flash(f'Welcome back, {user.username}!', 'success')
             return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password', 'error')
-            return render_template('login.html')
-
+        flash('Invalid username or password', 'error')
+        return render_template('login.html')
     return render_template('login.html')
 
 
@@ -304,110 +256,130 @@ def logout():
     return redirect(url_for('login'))
 
 
-# Main routes
 @app.route('/')
 @login_required
 def index():
     cart = session.get('cart', [])
     cart_total = sum(item['price'] for item in cart)
-    all_products = Product.query.all()
-    products = [p.to_dict() for p in all_products]
+    products = [p.to_dict() for p in Product.query.all()]
     return render_template('index.html', products=products, cart=cart, cart_total=cart_total, username=session.get('username'))
 
 
 @app.route('/api/products', methods=['POST'])
 @login_required
 def add_product():
-    data = request.json
-    name = data.get('name', '').strip()
-    price = data.get('price', 0)
-    
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
     try:
-        price = float(price)
-        if not name or price <= 0:
-            return jsonify({'error': 'Invalid name or price'}), 400
-        
-        product = Product(
-            id=str(uuid.uuid4()),
-            name=name,
-            price=round(price, 2),
-            user_id=session.get('user_id')
-        )
-        
-        db.session.add(product)
-        db.session.commit()
-        
-        return jsonify(product.to_dict()), 201
-    except (ValueError, TypeError):
+        price = float(data.get('price', 0))
+    except (TypeError, ValueError):
         return jsonify({'error': 'Invalid price format'}), 400
+    if not name or price <= 0:
+        return jsonify({'error': 'Invalid name or price'}), 400
+    product = Product(id=str(uuid.uuid4()), name=name, price=round(price, 2), user_id=session.get('user_id'))
+    db.session.add(product)
+    db.session.commit()
+    return jsonify(product.to_dict()), 201
 
 
 @app.route('/api/products/<product_id>/qr')
 @login_required
 def get_product_qr(product_id):
     product = Product.query.get(product_id)
-    
     if not product:
         return jsonify({'error': 'Product not found'}), 404
-    
-    # Generate QR code with product data
-    qr_data = json.dumps({
-        'id': product.id,
-        'name': product.name,
-        'price': product.price
-    })
-    
+    qr_data = json.dumps({'id': product.id, 'name': product.name, 'price': product.price})
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(qr_data)
     qr.make(fit=True)
-    
-    img = qr.make_image(fill_color="black", back_color="white")
+    img = qr.make_image(fill_color='black', back_color='white')
     img_io = io.BytesIO()
     img.save(img_io, 'PNG')
     img_io.seek(0)
-    
     return send_file(img_io, mimetype='image/png')
 
 
-@app.route('/api/cart', methods=['POST'])
+@app.route('/api/products/<product_id>', methods=['PUT'])
 @login_required
-def add_to_cart():
-    data = request.json
-    
-    # Check if it's a product ID from the list
-    product_id = data.get('product_id')
-    if product_id:
-        product = Product.query.get(product_id)
-        if product:
-            cart = session.get('cart', [])
-            cart.append({
-                'id': str(uuid.uuid4()),
-                'name': product.name,
-                'price': product.price
-            })
-            session['cart'] = cart
-            return jsonify({'message': 'Added to cart', 'cart': cart}), 200
-    
-    # Check if it's scanned QR data
-    if 'name' in data and 'price' in data:
-        cart = session.get('cart', [])
-        cart.append({
-            'id': str(uuid.uuid4()),
-            'name': data['name'],
-            'price': float(data['price'])
-        })
-        session['cart'] = cart
-        return jsonify({'message': 'Added to cart', 'cart': cart}), 200
-    
-    return jsonify({'error': 'Invalid data'}), 400
+def update_product(product_id):
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    try:
+        price = float(data.get('price', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid price format'}), 400
+    if not name or price <= 0:
+        return jsonify({'error': 'Invalid name or price'}), 400
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({'error': 'Product not found'}), 404
+    product.name = name
+    product.price = round(price, 2)
+    db.session.commit()
+    return jsonify(product.to_dict()), 200
+
+
+@app.route('/api/products/<product_id>', methods=['DELETE'])
+@login_required
+def delete_product(product_id):
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({'error': 'Product not found'}), 404
+    if product.id in ('1', '2', '3'):
+        return jsonify({'error': 'Cannot delete default products'}), 400
+    db.session.delete(product)
+    db.session.commit()
+    return jsonify({'message': 'Product deleted'}), 200
+
+
+@app.route('/api/products/bulk-delete', methods=['POST'])
+@login_required
+def bulk_delete_products():
+    data = request.get_json() or {}
+    product_ids = data.get('product_ids') or []
+    if not isinstance(product_ids, list):
+        return jsonify({'error': 'Invalid product IDs'}), 400
+    product_ids = [p for p in product_ids if p not in ('1', '2', '3')]
+    if not product_ids:
+        return jsonify({'error': 'No valid products to delete'}), 400
+    products = Product.query.filter(Product.id.in_(product_ids)).all()
+    for p in products:
+        db.session.delete(p)
+    db.session.commit()
+    return jsonify({'message': f'{len(products)} product(s) deleted', 'deleted_count': len(products)}), 200
 
 
 @app.route('/api/cart', methods=['GET'])
 @login_required
 def get_cart():
     cart = session.get('cart', [])
-    cart_total = sum(item['price'] for item in cart)
-    return jsonify({'cart': cart, 'total': cart_total})
+    total = sum(item['price'] for item in cart)
+    return jsonify({'cart': cart, 'total': total})
+
+
+@app.route('/api/cart', methods=['POST'])
+@login_required
+def add_to_cart():
+    data = request.get_json() or {}
+    product_id = data.get('product_id')
+    if product_id:
+        product = Product.query.get(product_id)
+        if product:
+            cart = session.get('cart', [])
+            cart.append({'id': str(uuid.uuid4()), 'name': product.name, 'price': product.price, 'product_id': product.id})
+            session['cart'] = cart
+            return jsonify({'message': 'Added to cart', 'cart': cart}), 200
+    if 'name' in data and 'price' in data:
+        cart = session.get('cart', [])
+        cart.append({
+            'id': str(uuid.uuid4()),
+            'name': data['name'],
+            'price': float(data['price']),
+            'product_id': data.get('id'),
+        })
+        session['cart'] = cart
+        return jsonify({'message': 'Added to cart', 'cart': cart}), 200
+    return jsonify({'error': 'Invalid data'}), 400
 
 
 @app.route('/api/cart', methods=['DELETE'])
@@ -418,4 +390,5 @@ def clear_cart():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)

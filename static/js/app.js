@@ -1,154 +1,192 @@
-let stream = null;
-let scanningInterval = null;
+let stream=null,isScanning=false,lastScannedCode=null,currentFacingMode='environment';
+function isIOS(){return/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
+function getVideoConstraints(){return isIOS()?{video:{facingMode:{ideal:currentFacingMode},width:{min:320},height:{min:240}},audio:false}:{video:{facingMode:currentFacingMode,width:{ideal:1280},height:{ideal:720}},audio:false};}
 
-// Handle product form submission
-document.getElementById('productForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const name = document.getElementById('productName').value.trim();
-    const price = parseFloat(document.getElementById('productPrice').value);
-    
-    if (!name || isNaN(price) || price <= 0) {
-        alert('Please enter a valid name and price.');
-        return;
-    }
-    
-    try {
-        const response = await fetch('/api/products', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ name, price }),
-        });
-        
-        if (response.ok) {
-            const product = await response.json();
-            location.reload(); // Reload to show new product
-        } else {
-            const error = await response.json();
-            alert(error.error || 'Failed to add product');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to add product');
-    }
-    
-    document.getElementById('productForm').reset();
+document.getElementById('productForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  const name=document.getElementById('productName').value.trim(),price=parseFloat(document.getElementById('productPrice').value);
+  if(!name||isNaN(price)||price<=0){alert('Enter valid name and price');return;}
+  try{
+    const r=await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
+    if(r.ok)location.reload();else{const d=await r.json();alert(d.error||'Failed');}
+  }catch(err){alert('Failed');}
+  this.reset();
 });
 
-// Add to cart from product list
-async function addToCartFromList(productId) {
-    try {
-        const response = await fetch('/api/cart', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ product_id: productId }),
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            location.reload(); // Reload to update cart
-        } else {
-            alert('Failed to add to cart');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to add to cart');
-    }
+async function addToCartFromList(productId){
+  try{
+    const r=await fetch('/api/cart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:productId})});
+    if(r.ok)location.reload();else alert('Failed');
+  }catch(e){alert('Failed');}
 }
 
-// Open QR scanner
-function openScanner() {
-    const modal = document.getElementById('scannerModal');
-    modal.classList.add('active');
-    
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // Use back camera on mobile
-    })
-    .then((mediaStream) => {
-        stream = mediaStream;
-        video.srcObject = stream;
-        video.play();
-        
-        scanningInterval = setInterval(() => {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height);
-                
-                if (code) {
-                    handleScannedQR(code.data);
-                }
-            }
-        }, 100);
-    })
-    .catch((error) => {
-        console.error('Error accessing camera:', error);
-        document.getElementById('scannerStatus').textContent = 
-            'Camera access denied. Please allow camera permissions.';
+async function clearCart(){
+  if(!confirm('Clear cart?'))return;
+  try{
+    const r=await fetch('/api/cart',{method:'DELETE'});
+    if(r.ok)location.reload();else alert('Failed');
+  }catch(e){alert('Failed');}
+}
+
+function openEditModal(id,name,price){
+  document.getElementById('editProductId').value=id;
+  document.getElementById('editProductName').value=name;
+  document.getElementById('editProductPrice').value=price;
+  document.getElementById('editProductModal').classList.add('active');
+}
+function closeEditModal(){
+  document.getElementById('editProductModal').classList.remove('active');
+  document.getElementById('editProductForm').reset();
+}
+
+document.getElementById('editProductForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  const id=document.getElementById('editProductId').value,name=document.getElementById('editProductName').value.trim(),price=parseFloat(document.getElementById('editProductPrice').value);
+  if(!name||isNaN(price)||price<=0){alert('Invalid');return;}
+  try{
+    const r=await fetch('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
+    if(r.ok){closeEditModal();location.reload();}else{alert((await r.json()).error||'Failed');}
+  }catch(e){alert('Failed');}
+});
+
+async function deleteProduct(productId,productName){
+  if(!confirm('Delete "'+productName+'"?'))return;
+  try{
+    const r=await fetch('/api/products/'+productId,{method:'DELETE'});
+    if(r.ok)location.reload();else alert((await r.json()).error||'Failed');
+  }catch(e){alert('Failed');}
+}
+
+function toggleSelectAll(){
+  const all=document.getElementById('selectAllProducts').checked;
+  document.querySelectorAll('.product-checkbox-input').forEach(cb=>cb.checked=all);
+  updateBulkDeleteButton();
+}
+function updateBulkDeleteButton(){
+  const n=document.querySelectorAll('.product-checkbox-input:checked').length;
+  const b1=document.getElementById('bulkDeleteBtn'),b2=document.getElementById('bulkPrintBtn');
+  if(b1)b1.style.display=n?'block':'none';
+  if(b2)b2.style.display=n?'block':'none';
+}
+
+async function bulkDeleteProducts(){
+  const ids=Array.from(document.querySelectorAll('.product-checkbox-input:checked')).map(c=>c.value);
+  if(!ids.length){alert('Select at least one product');return;}
+  if(!confirm('Delete '+ids.length+' product(s)?'))return;
+  try{
+    const r=await fetch('/api/products/bulk-delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_ids:ids})});
+    if(r.ok){const d=await r.json();alert(d.message);location.reload();}else alert((await r.json()).error||'Failed');
+  }catch(e){alert('Failed');}
+}
+
+async function preparePrintFromCart(){
+  try{
+    const r=await fetch('/api/cart'),d=await r.json(),cart=d.cart||[];
+    if(!cart.length){alert('Cart is empty');return;}
+    const items=cart.map(item=>{
+      let pid=item.product_id;
+      if(!pid){
+        document.querySelectorAll('.product-row').forEach(row=>{
+          if(row.querySelector('.product-name').textContent.trim()===item.name)
+            pid=row.getAttribute('data-product-id');
+        });
+      }
+      return{name:item.name,price:item.price,qrUrl:pid?'/api/products/'+pid+'/qr':null};
     });
+    openPrintModal(items,'Shopping Cart');
+  }catch(e){alert('Failed');}
 }
 
-// Close QR scanner
-function closeScanner() {
-    const modal = document.getElementById('scannerModal');
-    modal.classList.remove('active');
-    
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
-    }
-    
-    if (scanningInterval) {
-        clearInterval(scanningInterval);
-        scanningInterval = null;
-    }
-    
-    const video = document.getElementById('video');
-    video.srcObject = null;
-    document.getElementById('scannerStatus').textContent = 'Point camera at QR code...';
+async function preparePrintFromProducts(){
+  const checkboxes=document.querySelectorAll('.product-checkbox-input:checked');
+  if(!checkboxes.length){alert('Select at least one product');return;}
+  const items=Array.from(checkboxes).map(cb=>{
+    const row=cb.closest('.product-row'),name=row.querySelector('.product-name').textContent.trim(),priceText=row.querySelector('.product-price').textContent.trim(),price=parseFloat(priceText.replace('$',''))||0;
+    return{name,price,qrUrl:'/api/products/'+cb.value+'/qr'};
+  });
+  openPrintModal(items,'Selected Products');
 }
 
-// Handle scanned QR code
-async function handleScannedQR(qrData) {
-    try {
-        const data = JSON.parse(qrData);
-        
-        const response = await fetch('/api/cart', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data),
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            alert(`Added to cart: ${data.name} - $${data.price.toFixed(2)}`);
-            closeScanner();
-            location.reload(); // Reload to update cart
-        } else {
-            alert('Failed to add to cart');
-        }
-    } catch (error) {
-        console.error('Error parsing QR code:', error);
-        alert('Invalid QR code format');
-    }
+function openPrintModal(items,title){
+  const html=['<div class="print-title"><h1>'+title+'</h1><p class="print-date">'+new Date().toLocaleString()+'</p></div><div class="print-items-grid">'];
+  items.forEach(item=>{
+    const qr=item.qrUrl?'<img src="'+item.qrUrl+'" alt="QR" class="print-qr-image">':'<p class="no-qr">No QR</p>';
+    html.push('<div class="print-item"><div class="print-item-header"><h3 class="print-item-name">'+escapeHtml(item.name)+'</h3><div class="print-item-price">$'+item.price.toFixed(2)+'</div></div><div class="print-item-qr">'+qr+'</div></div>');
+  });
+  const total=items.reduce((s,i)=>s+i.price,0);
+  html.push('</div><div class="print-footer"><p>Items: '+items.length+'</p><p>Total: $'+total.toFixed(2)+'</p></div>');
+  document.getElementById('printContent').innerHTML=html.join('');
+  document.getElementById('printModal').classList.add('active');
 }
+function closePrintModal(){document.getElementById('printModal').classList.remove('active');}
+function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 
-// Close modal when clicking outside
-document.getElementById('scannerModal').addEventListener('click', (e) => {
-    if (e.target.id === 'scannerModal') {
-        closeScanner();
+document.getElementById('editProductModal').addEventListener('click',e=>{if(e.target.id==='editProductModal')closeEditModal();});
+document.getElementById('printModal').addEventListener('click',e=>{if(e.target.id==='printModal')closePrintModal();});
+
+function openScanner(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){alert('Camera not supported');return;}
+  document.getElementById('scannerModal').classList.add('active');
+  document.body.style.overflow='hidden';
+  isScanning=false;lastScannedCode=null;currentFacingMode='environment';
+  const v=document.getElementById('video');v.setAttribute('playsinline',true);v.setAttribute('webkit-playsinline',true);v.muted=true;
+  startCamera();
+}
+function startCamera(){
+  const video=document.getElementById('video'),status=document.getElementById('scannerStatus'),switchBtn=document.getElementById('switchCameraBtn');
+  status.textContent='Requesting camera...';
+  navigator.mediaDevices.getUserMedia(getVideoConstraints()).then(mediaStream=>{
+    stream=mediaStream;video.srcObject=stream;
+    video.onloadedmetadata=()=>{
+      video.play().then(()=>{status.textContent='Point at QR code...';isScanning=true;startScanning();}).catch(()=>{status.textContent='Error starting camera';status.className='scanner-status error';});
+    };
+  }).catch(err=>{
+    isScanning=false;
+    let msg='Camera denied. ';
+    if(err.name==='NotAllowedError')msg+='Allow in Settings.';
+    else if(err.name==='NotFoundError')msg+='No camera found.';
+    else if(err.name==='OverconstrainedError'&&isIOS()){status.textContent='Trying...';navigator.mediaDevices.getUserMedia({video:true}).then(s=>{stream=s;video.srcObject=s;video.onloadedmetadata=()=>{video.play().then(()=>{isScanning=true;startScanning();});};}).catch(()=>{status.textContent='Camera error';});return;}
+    else msg+=err.message||'';
+    status.textContent=msg;status.className='scanner-status error';
+  });
+}
+function startScanning(){
+  const video=document.getElementById('video'),canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+  function scan(){
+    if(!isScanning||!video||video.readyState!==4)return;
+    const w=video.videoWidth,h=video.videoHeight;
+    if(w>0&&h>0){canvas.width=w;canvas.height=h;ctx.drawImage(video,0,0,w,h);
+      const id=ctx.getImageData(0,0,w,h),code=jsQR(id.data,id.width,id.height);
+      if(code&&code.data!==lastScannedCode){lastScannedCode=code.data;handleScannedQR(code.data);}
     }
-});
+    requestAnimationFrame(scan);
+  }
+  scan();
+}
+function switchCamera(){
+  if(!stream)return;
+  stream.getTracks().forEach(t=>t.stop());
+  currentFacingMode=currentFacingMode==='environment'?'user':'environment';
+  startCamera();
+}
+function closeScanner(){
+  document.getElementById('scannerModal').classList.remove('active');
+  document.body.style.overflow='';
+  isScanning=false;lastScannedCode=null;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  const v=document.getElementById('video'),s=document.getElementById('scannerStatus');
+  if(v)v.srcObject=null;
+  if(s){s.textContent='Point at QR code...';s.className='scanner-status';}
+}
+async function handleScannedQR(data){
+  if(!isScanning)return;
+  isScanning=false;
+  document.getElementById('scannerStatus').textContent='Processing...';
+  try{
+    const obj=JSON.parse(data);
+    const r=await fetch('/api/cart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});
+    if(r.ok){document.getElementById('scannerStatus').textContent='Added: '+obj.name+' - $'+obj.price.toFixed(2);setTimeout(()=>{closeScanner();location.reload();},1000);}
+    else{document.getElementById('scannerStatus').textContent='Failed';document.getElementById('scannerStatus').className='scanner-status error';setTimeout(()=>{isScanning=true;document.getElementById('scannerStatus').textContent='Point at QR code...';},2000);}
+  }catch(e){document.getElementById('scannerStatus').textContent='Invalid QR';document.getElementById('scannerStatus').className='scanner-status error';setTimeout(()=>{isScanning=true;document.getElementById('scannerStatus').textContent='Point at QR code...';},2000);}
+}
+document.getElementById('scannerModal').addEventListener('click',e=>{if(e.target.id==='scannerModal')closeScanner();});
