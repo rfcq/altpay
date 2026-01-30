@@ -39,6 +39,19 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
+def _is_ephemeral_db():
+    """True when on Vercel without a persistent DATABASE_URL (SQLite in /tmp)."""
+    if not os.environ.get('VERCEL'):
+        return False
+    raw = (os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL') or '').strip()
+    return not (raw and ('postgresql://' in raw or 'postgres://' in raw))
+
+
+@app.context_processor
+def inject_ephemeral_db_warning():
+    return {'use_ephemeral_db': _is_ephemeral_db()}
+
+
 def _instance_key_path():
     base = '/tmp' if os.environ.get('VERCEL') else basedir
     instance_dir = os.path.join(base, 'instance')

@@ -12,6 +12,9 @@
         <div class="auth-card">
             <h1 class="auth-title">AltPay Shop</h1>
             <h2 class="auth-subtitle">Login</h2>
+            {% if use_ephemeral_db %}
+                <div class="flash-message flash-error" role="alert" style="margin-bottom:1rem">Data is not persistent on this deployment. Accounts may disappear between visits. Add <code>DATABASE_URL</code> for persistent storage (see VERCEL.md).</div>
+            {% endif %}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
