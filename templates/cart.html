@@ -14,7 +14,8 @@
             <div class="cart-row"><span class="cart-name">{{ item.name }}</span><span class="cart-price">{{ strings.currency }} {{ "%.2f"|format(item.price) }}</span></div>
             {% endfor %}
             <div class="cart-total-row"><span class="cart-total-label">{{ strings.total }}</span><span class="cart-total-value">{{ strings.currency }} {{ "%.2f"|format(cart_total) }}</span></div>
-            <button type="button" class="btn btn-primary" onclick="preparePrintFromCart()" style="margin-top:12px">{{ strings.print_cart }}</button>
+            <button type="button" class="btn btn-primary" onclick="finishBuy()" style="margin-top:12px">{{ strings.finish_buy }}</button>
+            <button type="button" class="btn btn-outline" onclick="preparePrintFromCart()" style="margin-top:8px">{{ strings.print_cart }}</button>
             <button type="button" class="btn btn-danger" onclick="clearCart()" style="margin-top:8px">{{ strings.clear_cart }}</button>
             {% else %}
             <p class="empty-text">{{ strings.cart_empty }} <a href="{{ url_for('products') }}">{{ strings.nav_products }}</a>.</p>

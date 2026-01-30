@@ -10,6 +10,7 @@
         {% if products %}
         <div style="margin-bottom:12px">
             <label class="checkbox-label"><input type="checkbox" id="selectAllProducts" onchange="toggleSelectAll()"> {{ strings.select_all }}</label>
+            <button id="bulkAddToCartBtn" class="btn-small btn-primary" onclick="addSelectedToCart()" style="display:none;margin-left:8px">{{ strings.add_selected_to_cart }}</button>
             <button id="bulkPrintBtn" class="btn-small btn-primary" onclick="preparePrintFromProducts()" style="display:none;margin-left:8px">{{ strings.print_selected }}</button>
             <button id="bulkDeleteBtn" class="btn-small btn-danger" onclick="bulkDeleteProducts()" style="display:none;margin-left:8px">{{ strings.delete_selected }}</button>
         </div>

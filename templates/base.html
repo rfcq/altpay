@@ -19,6 +19,7 @@
             <a href="{{ url_for('create_product_page') }}" class="sidebar-link {% if request.endpoint == 'create_product_page' %}active{% endif %}">{{ strings.nav_create_product }}</a>
             <a href="{{ url_for('products') }}" class="sidebar-link {% if request.endpoint == 'products' %}active{% endif %}">{{ strings.nav_products }}</a>
             <a href="{{ url_for('cart_page') }}" class="sidebar-link {% if request.endpoint == 'cart_page' %}active{% endif %}">{{ strings.nav_cart }}</a>
+            <a href="{{ url_for('products_sold_page') }}" class="sidebar-link {% if request.endpoint == 'products_sold_page' %}active{% endif %}">{{ strings.products_sold }}</a>
             {% if is_admin %}
             <a href="{{ url_for('users_page') }}" class="sidebar-link {% if request.endpoint == 'users_page' %}active{% endif %}">{{ strings.nav_users }}</a>
             {% endif %}

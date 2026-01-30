@@ -83,6 +83,17 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f4f4fb;color:#11
 .cart-total-row{display:flex;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:2px solid #e5e7eb}
 .cart-total-label{font-size:16px;font-weight:600;color:#111}
 .cart-total-value{font-size:18px;font-weight:700;color:#16a34a}
+.sales-list{display:flex;flex-direction:column;gap:16px}
+.sale-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+.sale-header{margin-bottom:10px;font-size:14px;font-weight:600;color:#374151}
+.sale-date{font-weight:500}
+.sale-items{list-style:none;margin:0;padding:0;font-size:14px}
+.sale-item-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6}
+.sale-item-name{color:#111}
+.sale-item-price{font-weight:500;color:#111}
+.sale-total-row{display:flex;justify-content:space-between;padding-top:10px;margin-top:8px;border-top:2px solid #e5e7eb}
+.sale-total-label{font-weight:600;color:#111}
+.sale-total-value{font-size:16px;font-weight:700;color:#16a34a}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);align-items:center;justify-content:center;z-index:1000}
 .modal.active{display:flex}
 .modal-content{background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto}

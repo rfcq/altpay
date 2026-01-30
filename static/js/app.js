@@ -39,6 +39,15 @@ async function clearCart(){
   }catch(e){alert(t('failed'));}
 }
 
+async function finishBuy(){
+  try{
+    const r=await fetch('/api/cart/checkout',{method:'POST',headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    if(r.ok){alert(d.message||t('checkout_success'));window.location.href='/products-sold';}
+    else alert(d.error||t('failed'));
+  }catch(e){alert(t('failed'));}
+}
+
 function openEditModal(id,name,price){
   var m=document.getElementById('editProductModal'),f=document.getElementById('editProductForm');
   if(m&&f){document.getElementById('editProductId').value=id;document.getElementById('editProductName').value=name;document.getElementById('editProductPrice').value=price;m.classList.add('active');}
@@ -77,9 +86,23 @@ function toggleSelectAll(){
 }
 function updateBulkDeleteButton(){
   const n=document.querySelectorAll('.product-checkbox-input:checked').length;
-  const b1=document.getElementById('bulkDeleteBtn'),b2=document.getElementById('bulkPrintBtn');
+  const b1=document.getElementById('bulkDeleteBtn'),b2=document.getElementById('bulkPrintBtn'),b3=document.getElementById('bulkAddToCartBtn');
   if(b1)b1.style.display=n?'block':'none';
   if(b2)b2.style.display=n?'block':'none';
+  if(b3)b3.style.display=n?'block':'none';
+}
+
+async function addSelectedToCart(){
+  const ids=Array.from(document.querySelectorAll('.product-checkbox-input:checked')).map(c=>c.value);
+  if(!ids.length){alert(t('select_at_least_one'));return;}
+  try{
+    for(const productId of ids){
+      const r=await fetch('/api/cart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:productId})});
+      if(!r.ok){alert((await r.json()).error||t('failed'));return;}
+    }
+    alert(t('msg_added_n_to_cart',{n:ids.length}));
+    location.reload();
+  }catch(e){alert(t('failed'));}
 }
 
 async function bulkDeleteProducts(){

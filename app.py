@@ -185,6 +185,23 @@ class Product(db.Model):
         return {'id': self.id, 'name': self.name, 'price': self.price}
 
 
+class Sale(db.Model):
+    __tablename__ = 'sale'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    items = db.relationship('SaleItem', backref='sale', lazy=True, cascade='all, delete-orphan')
+
+
+class SaleItem(db.Model):
+    __tablename__ = 'sale_item'
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sale.id'), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    product_id = db.Column(db.String(36), nullable=True)
+
+
 def init_db():
     with app.app_context():
         try:
@@ -634,6 +651,50 @@ def add_to_cart():
 def clear_cart():
     session['cart'] = []
     return jsonify({'message': _t('msg_cart_cleared')}), 200
+
+
+@app.route('/api/cart/checkout', methods=['POST'])
+@login_required
+def checkout():
+    cart = session.get('cart', [])
+    if not cart:
+        return jsonify({'error': _t('checkout_cart_empty')}), 400
+    user_id = session.get('user_id')
+    try:
+        sale = Sale(user_id=user_id)
+        db.session.add(sale)
+        db.session.flush()
+        for item in cart:
+            si = SaleItem(sale_id=sale.id, name=item.get('name', ''), price=float(item.get('price', 0)), product_id=item.get('product_id'))
+            db.session.add(si)
+        db.session.commit()
+        session['cart'] = []
+        return jsonify({
+            'message': _t('checkout_success'),
+            'sale_id': sale.id,
+            'items_count': len(cart),
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception(e)
+        return jsonify({'error': _t('checkout_error') + ' ' + str(e)}), 500
+
+
+@app.route('/products-sold')
+@login_required
+def products_sold_page():
+    sales = Sale.query.filter_by(user_id=session.get('user_id')).order_by(Sale.created_at.desc()).all()
+    sales_data = []
+    for s in sales:
+        items = [{'name': i.name, 'price': i.price} for i in s.items]
+        total = sum(i.price for i in s.items)
+        sales_data.append({
+            'id': s.id,
+            'created_at': s.created_at,
+            'line_items': items,
+            'total': total,
+        })
+    return render_template('products_sold.html', sales=sales_data, username=session.get('username'))
 
 
 if __name__ == '__main__':

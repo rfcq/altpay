@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ strings.products_sold_title }}{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="section-title">{{ strings.products_sold }}</h2>
+            <span class="badge">{{ sales|length }}</span>
+        </div>
+        {% if sales %}
+        <p class="text-muted" style="margin-bottom:12px;font-size:14px;color:#6b7280">{{ strings.products_sold_hint }}</p>
+        <div class="sales-list">
+            {% for sale in sales %}
+            <div class="sale-card">
+                <div class="sale-header">
+                    <span class="sale-date">{{ strings.sale_date }}: {{ sale.created_at.strftime('%d/%m/%Y %H:%M') if sale.created_at else '—' }}</span>
+                </div>
+                <ul class="sale-items">
+                    {% for item in sale.line_items %}
+                    <li class="sale-item-row"><span class="sale-item-name">{{ item.name }}</span><span class="sale-item-price">{{ strings.currency }} {{ "%.2f"|format(item.price) }}</span></li>
+                    {% endfor %}
+                </ul>
+                <div class="sale-total-row"><span class="sale-total-label">{{ strings.sale_total }}</span><span class="sale-total-value">{{ strings.currency }} {{ "%.2f"|format(sale.total) }}</span></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-text">{{ strings.products_sold_empty }}</p>
+        <p class="empty-text"><a href="{{ url_for('cart_page') }}">{{ strings.nav_cart }}</a></p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
