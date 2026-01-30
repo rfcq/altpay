@@ -8,6 +8,7 @@ from functools import wraps
 from cryptography.fernet import Fernet
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
+import csv
 import hashlib
 import qrcode
 import io
@@ -443,6 +444,90 @@ def add_product():
     db.session.add(product)
     db.session.commit()
     return jsonify(product.to_dict()), 201
+
+
+def _parse_import_row(row):
+    """Normalize a dict row to name/price. Accepts name, nome, price, preco (case-insensitive)."""
+    key_map = {k.lower().strip(): k for k in row}
+    name_key = next((key_map[k] for k in ('name', 'nome', 'product', 'produto') if k in key_map), None)
+    price_key = next((key_map[k] for k in ('price', 'preco', 'preço') if k in key_map), None)
+    if not name_key or not price_key:
+        return None, None
+    name = (row.get(name_key) or '').strip()
+    if not name:
+        return None, None
+    try:
+        price = float(str(row.get(price_key) or '0').replace(',', '.').strip())
+    except (TypeError, ValueError):
+        return name, None
+    if price <= 0:
+        return name, None
+    return name, round(price, 2)
+
+
+@app.route('/api/products/import', methods=['POST'])
+@login_required
+def import_products():
+    if 'file' not in request.files:
+        return jsonify({'error': _t('import_no_file')}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': _t('import_no_file')}), 400
+    fn = (f.filename or '').lower()
+    if not (fn.endswith('.csv') or fn.endswith('.json')):
+        return jsonify({'error': _t('import_bad_type')}), 400
+    try:
+        content = f.read()
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', errors='replace')
+        created = 0
+        errors = []
+        user_id = session.get('user_id')
+        if fn.endswith('.csv'):
+            reader = csv.DictReader(io.StringIO(content), delimiter=',')
+            if not reader.fieldnames:
+                return jsonify({'error': _t('import_empty')}), 400
+            for i, row in enumerate(reader):
+                name, price = _parse_import_row(row)
+                if name is None and price is None:
+                    continue
+                if price is None:
+                    errors.append(_t('import_row_invalid', row=i + 2))
+                    continue
+                db.session.add(Product(id=str(uuid.uuid4()), name=name, price=price, user_id=user_id))
+                created += 1
+        else:
+            data = json.loads(content)
+            if isinstance(data, dict) and 'products' in data:
+                items = data['products']
+            elif isinstance(data, list):
+                items = data
+            else:
+                return jsonify({'error': _t('import_json_format')}), 400
+            for i, item in enumerate(items):
+                if not isinstance(item, dict):
+                    errors.append(_t('import_row_invalid', row=i + 1))
+                    continue
+                name, price = _parse_import_row(item)
+                if name is None and price is None:
+                    continue
+                if price is None:
+                    errors.append(_t('import_row_invalid', row=i + 1))
+                    continue
+                db.session.add(Product(id=str(uuid.uuid4()), name=name, price=price, user_id=user_id))
+                created += 1
+        db.session.commit()
+        return jsonify({
+            'message': _t('import_success', count=created),
+            'created': created,
+            'errors': errors[:20],
+        }), 200
+    except json.JSONDecodeError as e:
+        return jsonify({'error': _t('import_json_invalid') + ' ' + str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception(e)
+        return jsonify({'error': _t('import_error') + ' ' + str(e)}), 500
 
 
 @app.route('/api/products/<product_id>/qr')

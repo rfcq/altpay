@@ -12,5 +12,57 @@
             <button type="submit" class="btn btn-primary">{{ strings.add_product }}</button>
         </form>
     </div>
+    <div class="card">
+        <h2 class="section-title">{{ strings.import_from_file }}</h2>
+        <p class="text-muted import-hint">{{ strings.import_format_hint }}</p>
+        <form id="importForm" class="product-form">
+            <label for="importFile">{{ strings.import_select_file }}</label>
+            <input type="file" id="importFile" name="file" accept=".csv,.json" required>
+            <button type="submit" class="btn btn-primary">{{ strings.import_btn }}</button>
+        </form>
+        <p id="importResult" class="import-result" style="display:none;margin-top:12px;font-size:14px"></p>
+    </div>
 </div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  var form = document.getElementById('importForm');
+  if (!form) return;
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var fileInput = document.getElementById('importFile');
+    var resultEl = document.getElementById('importResult');
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+      resultEl.style.display = 'block';
+      resultEl.className = 'import-result error';
+      resultEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.import_no_file) || 'No file selected.';
+      return;
+    }
+    var fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    resultEl.style.display = 'block';
+    resultEl.className = 'import-result';
+    resultEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.processing) || 'Processing...';
+    try {
+      var r = await fetch('/api/products/import', { method: 'POST', body: fd });
+      var d = await r.json();
+      if (r.ok) {
+        resultEl.className = 'import-result success';
+        resultEl.textContent = d.message || (d.created + ' imported.');
+        if (d.errors && d.errors.length) resultEl.textContent += ' ' + d.errors.join(' ');
+        fileInput.value = '';
+        setTimeout(function() { window.location.href = '/products'; }, 1500);
+      } else {
+        resultEl.className = 'import-result error';
+        resultEl.textContent = d.error || 'Import failed.';
+      }
+    } catch (err) {
+      resultEl.className = 'import-result error';
+      resultEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.import_error) || 'Import failed.';
+    }
+  });
+})();
+</script>
 {% endblock %}

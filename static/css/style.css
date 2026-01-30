@@ -74,6 +74,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f4f4fb;color:#11
 .role-badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .role-badge.role-admin{background:#dbeafe;color:#1e40af}
 .role-badge.role-user{background:#f3f4f6;color:#4b5563}
+.import-hint{font-size:13px;color:#6b7280;margin-bottom:12px}
+.import-result.success{color:#059669}
+.import-result.error{color:#dc2626}
 .cart-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6}
 .cart-name{font-size:15px;color:#111}
 .cart-price{font-size:15px;font-weight:500;color:#111}
