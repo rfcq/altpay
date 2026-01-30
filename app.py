@@ -16,6 +16,8 @@ import uuid
 from datetime import datetime
 import os
 
+from translations import TRANSLATIONS, SUPPORTED_LANGS, JS_KEYS
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 
@@ -47,9 +49,30 @@ def _is_ephemeral_db():
     return not (raw and ('postgresql://' in raw or 'postgres://' in raw))
 
 
+def get_current_lang():
+    return session.get('lang') or 'en'
+
+
+def _t(key, **kwargs):
+    """Get translated string for current language."""
+    lang = get_current_lang()
+    s = TRANSLATIONS.get(lang, TRANSLATIONS['en']).get(key, key)
+    if kwargs:
+        s = s.format(**kwargs)
+    return s
+
+
 @app.context_processor
 def inject_ephemeral_db_warning():
-    out = {'use_ephemeral_db': _is_ephemeral_db()}
+    lang = get_current_lang()
+    strings = TRANSLATIONS.get(lang, TRANSLATIONS['en'])
+    js_translations = {k: strings.get(k, TRANSLATIONS['en'].get(k, k)) for k in JS_KEYS}
+    out = {
+        'use_ephemeral_db': _is_ephemeral_db(),
+        'strings': strings,
+        'current_lang': lang,
+        'js_translations': json.dumps(js_translations),
+    }
     if 'user_id' in session:
         try:
             user = User.query.get(session['user_id'])
@@ -243,7 +266,7 @@ def admin_required(f):
         try:
             user = User.query.get(session['user_id'])
             if not user or user.role != ROLE_ADMIN:
-                flash('Admin access required', 'error')
+                flash(_t('msg_admin_required'), 'error')
                 return redirect(url_for('products'))
         except Exception:
             return redirect(url_for('login'))
@@ -270,6 +293,26 @@ def before_request():
         session['cart'] = []
 
 
+@app.before_request
+def ensure_lang():
+    """Redirect to language selection on first access (no lang in session)."""
+    if request.endpoint in (None, 'choose_language', 'static'):
+        return
+    if session.get('lang') is None:
+        next_url = request.url
+        return redirect(url_for('choose_language', next=next_url))
+
+
+@app.route('/choose-language')
+def choose_language():
+    lang = request.args.get('lang')
+    next_url = request.args.get('next') or url_for('login')
+    if lang in SUPPORTED_LANGS:
+        session['lang'] = lang
+        return redirect(next_url)
+    return render_template('choose_language.html', next_url=next_url or url_for('login'))
+
+
 def _register_allowed():
     """Allow register if no users exist (bootstrap first admin) or current user is admin."""
     if User.query.count() == 0:
@@ -285,33 +328,33 @@ def register():
     if request.method == 'GET':
         if not _register_allowed():
             if 'user_id' in session:
-                flash('Only admins can add new users.', 'error')
+                flash(_t('msg_only_admins'), 'error')
                 return redirect(url_for('products'))
-            flash('Contact an administrator for an account.', 'info')
+            flash(_t('msg_contact_admin'), 'info')
             return redirect(url_for('login'))
         return render_template('register.html', is_first_user=User.query.count() == 0)
     if request.method == 'POST':
         if not _register_allowed():
-            flash('Only admins can add new users.', 'error')
+            flash(_t('msg_only_admins'), 'error')
             return redirect(url_for('login'))
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
         if not username or not email or not password:
-            flash('All fields are required', 'error')
+            flash(_t('msg_all_required'), 'error')
             return render_template('register.html', is_first_user=User.query.count() == 0)
         if password != confirm:
-            flash('Passwords do not match', 'error')
+            flash(_t('msg_passwords_dont_match'), 'error')
             return render_template('register.html', is_first_user=User.query.count() == 0)
         if len(password) < 6:
-            flash('Password must be at least 6 characters', 'error')
+            flash(_t('msg_password_min'), 'error')
             return render_template('register.html', is_first_user=User.query.count() == 0)
         if User.query.filter_by(username_hash=_username_hash(username)).first():
-            flash('Username already exists', 'error')
+            flash(_t('msg_username_exists'), 'error')
             return render_template('register.html', is_first_user=User.query.count() == 0)
         if User.query.filter_by(email_hash=_email_hash(email)).first():
-            flash('Email already registered', 'error')
+            flash(_t('msg_email_registered'), 'error')
             return render_template('register.html', is_first_user=User.query.count() == 0)
         user = User()
         user.set_username(username)
@@ -321,7 +364,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         is_first = User.query.count() == 1
-        flash('Registration successful! Please login.' if is_first else 'User created. They can log in now.', 'success')
+        flash(_t('msg_registration_success') if is_first else _t('msg_user_created'), 'success')
         return redirect(url_for('login') if is_first else url_for('users_page'))
 
 
@@ -331,16 +374,16 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         if not username or not password:
-            flash('Please enter both username and password', 'error')
+            flash(_t('msg_enter_credentials'), 'error')
             return render_template('login.html')
         user = User.query.filter_by(username_hash=_username_hash(username)).first()
         if user and user.check_password(password):
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
-            flash(f'Welcome back, {user.username}!', 'success')
+            flash(_t('msg_welcome_back', username=user.username), 'success')
             return redirect(url_for('index'))
-        flash('Invalid username or password', 'error')
+        flash(_t('msg_invalid_credentials'), 'error')
         return render_template('login.html')
     return render_template('login.html')
 
@@ -349,7 +392,7 @@ def login():
 @login_required
 def logout():
     session.clear()
-    flash('You have been logged out', 'info')
+    flash(_t('msg_logged_out'), 'info')
     return redirect(url_for('login'))
 
 
@@ -397,9 +440,9 @@ def add_product():
     try:
         price = float(data.get('price', 0))
     except (TypeError, ValueError):
-        return jsonify({'error': 'Invalid price format'}), 400
+        return jsonify({'error': _t('err_invalid_price')}), 400
     if not name or price <= 0:
-        return jsonify({'error': 'Invalid name or price'}), 400
+        return jsonify({'error': _t('err_invalid_name_price')}), 400
     product = Product(id=str(uuid.uuid4()), name=name, price=round(price, 2), user_id=session.get('user_id'))
     db.session.add(product)
     db.session.commit()
@@ -411,7 +454,7 @@ def add_product():
 def get_product_qr(product_id):
     product = Product.query.get(product_id)
     if not product:
-        return jsonify({'error': 'Product not found'}), 404
+        return jsonify({'error': _t('err_product_not_found')}), 404
     qr_data = json.dumps({'id': product.id, 'name': product.name, 'price': product.price})
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
     qr.add_data(qr_data)
@@ -431,12 +474,12 @@ def update_product(product_id):
     try:
         price = float(data.get('price', 0))
     except (TypeError, ValueError):
-        return jsonify({'error': 'Invalid price format'}), 400
+        return jsonify({'error': _t('err_invalid_price')}), 400
     if not name or price <= 0:
-        return jsonify({'error': 'Invalid name or price'}), 400
+        return jsonify({'error': _t('err_invalid_name_price')}), 400
     product = Product.query.get(product_id)
     if not product:
-        return jsonify({'error': 'Product not found'}), 404
+        return jsonify({'error': _t('err_product_not_found')}), 404
     product.name = name
     product.price = round(price, 2)
     db.session.commit()
@@ -448,12 +491,12 @@ def update_product(product_id):
 def delete_product(product_id):
     product = Product.query.get(product_id)
     if not product:
-        return jsonify({'error': 'Product not found'}), 404
+        return jsonify({'error': _t('err_product_not_found')}), 404
     if product.id in ('1', '2', '3'):
-        return jsonify({'error': 'Cannot delete default products'}), 400
+        return jsonify({'error': _t('err_cannot_delete_default')}), 400
     db.session.delete(product)
     db.session.commit()
-    return jsonify({'message': 'Product deleted'}), 200
+    return jsonify({'message': _t('msg_product_deleted')}), 200
 
 
 @app.route('/api/products/bulk-delete', methods=['POST'])
@@ -462,15 +505,17 @@ def bulk_delete_products():
     data = request.get_json() or {}
     product_ids = data.get('product_ids') or []
     if not isinstance(product_ids, list):
-        return jsonify({'error': 'Invalid product IDs'}), 400
+        return jsonify({'error': _t('err_invalid_product_ids')}), 400
     product_ids = [p for p in product_ids if p not in ('1', '2', '3')]
     if not product_ids:
-        return jsonify({'error': 'No valid products to delete'}), 400
+        return jsonify({'error': _t('err_no_valid_products')}), 400
     products = Product.query.filter(Product.id.in_(product_ids)).all()
     for p in products:
         db.session.delete(p)
     db.session.commit()
-    return jsonify({'message': f'{len(products)} product(s) deleted', 'deleted_count': len(products)}), 200
+    n = len(products)
+    msg = _t('msg_one_product_deleted') if n == 1 else _t('msg_products_deleted', n=n)
+    return jsonify({'message': msg, 'deleted_count': n}), 200
 
 
 @app.route('/api/cart', methods=['GET'])
@@ -492,7 +537,7 @@ def add_to_cart():
             cart = session.get('cart', [])
             cart.append({'id': str(uuid.uuid4()), 'name': product.name, 'price': product.price, 'product_id': product.id})
             session['cart'] = cart
-            return jsonify({'message': 'Added to cart', 'cart': cart}), 200
+            return jsonify({'message': _t('msg_added_to_cart'), 'cart': cart}), 200
     if 'name' in data and 'price' in data:
         cart = session.get('cart', [])
         cart.append({
@@ -502,15 +547,15 @@ def add_to_cart():
             'product_id': data.get('id'),
         })
         session['cart'] = cart
-        return jsonify({'message': 'Added to cart', 'cart': cart}), 200
-    return jsonify({'error': 'Invalid data'}), 400
+        return jsonify({'message': _t('msg_added_to_cart'), 'cart': cart}), 200
+    return jsonify({'error': _t('err_invalid_data')}), 400
 
 
 @app.route('/api/cart', methods=['DELETE'])
 @login_required
 def clear_cart():
     session['cart'] = []
-    return jsonify({'message': 'Cart cleared'}), 200
+    return jsonify({'message': _t('msg_cart_cleared')}), 200
 
 
 if __name__ == '__main__':

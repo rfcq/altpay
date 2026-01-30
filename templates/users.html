@@ -1,36 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Users – AltPay Shop{% endblock %}
+{% block title %}{{ strings.users_title }}{% endblock %}
 {% block content %}
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h2 class="section-title">Users</h2>
-            <a href="{{ url_for('register') }}" class="btn btn-primary">Add user</a>
+            <h2 class="section-title">{{ strings.users }}</h2>
+            <a href="{{ url_for('register') }}" class="btn btn-primary">{{ strings.add_user }}</a>
         </div>
-        <p class="text-muted" style="margin-bottom:12px;font-size:14px;color:#6b7280">Only admins can add new users. New accounts can log in after you create them.</p>
+        <p class="text-muted" style="margin-bottom:12px;font-size:14px;color:#6b7280">{{ strings.users_hint }}</p>
         {% if users %}
         <div class="table-wrap">
             <table class="users-table">
                 <thead>
                     <tr>
-                        <th>Username</th>
-                        <th>Role</th>
-                        <th>Created</th>
+                        <th>{{ strings.username_col }}</th>
+                        <th>{{ strings.role }}</th>
+                        <th>{{ strings.created }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for u in users %}
                     <tr>
                         <td>{{ u.username }}</td>
-                        <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
-                        <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '—' }}</td>
+                        <td><span class="role-badge role-{{ u.role }}">{% if u.role == 'admin' %}{{ strings.role_admin }}{% else %}{{ strings.role_user }}{% endif %}</span></td>
+                        <td>{{ u.created_at.strftime('%d/%m/%Y %H:%M') if u.created_at else '—' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% else %}
-        <p class="empty-text">No users yet. <a href="{{ url_for('register') }}">Add the first user</a> (they will be admin).</p>
+        <p class="empty-text">{{ strings.no_users }} <a href="{{ url_for('register') }}">{{ strings.add_first_user }}</a>.</p>
         {% endif %}
     </div>
 </div>

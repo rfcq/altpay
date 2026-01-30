@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Create Product – AltPay Shop{% endblock %}
+{% block title %}{{ strings.create_product_title }}{% endblock %}
 {% block content %}
 <div class="container">
     <div class="card">
-        <h2 class="section-title">Create Product</h2>
+        <h2 class="section-title">{{ strings.create_product }}</h2>
         <form id="productForm" class="product-form">
-            <label for="productName">Name</label>
-            <input type="text" id="productName" placeholder="e.g. Coffee" required>
-            <label for="productPrice">Price</label>
-            <input type="number" id="productPrice" step="0.01" min="0.01" placeholder="9.90" required>
-            <button type="submit" class="btn btn-primary">Add product</button>
+            <label for="productName">{{ strings.name }}</label>
+            <input type="text" id="productName" placeholder="{{ strings.name_placeholder }}" required>
+            <label for="productPrice">{{ strings.price }}</label>
+            <input type="number" id="productPrice" step="0.01" min="0.01" placeholder="{{ strings.price_placeholder }}" required>
+            <button type="submit" class="btn btn-primary">{{ strings.add_product }}</button>
         </form>
     </div>
 </div>

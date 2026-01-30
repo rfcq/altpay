@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Products – AltPay Shop{% endblock %}
+{% block title %}{{ strings.products_title }}{% endblock %}
 {% block content %}
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h2 class="section-title">Products</h2>
+            <h2 class="section-title">{{ strings.products }}</h2>
             <span class="badge">{{ products|length }}</span>
         </div>
         {% if products %}
         <div style="margin-bottom:12px">
-            <label class="checkbox-label"><input type="checkbox" id="selectAllProducts" onchange="toggleSelectAll()"> Select all</label>
-            <button id="bulkPrintBtn" class="btn-small btn-primary" onclick="preparePrintFromProducts()" style="display:none;margin-left:8px">Print Selected</button>
-            <button id="bulkDeleteBtn" class="btn-small btn-danger" onclick="bulkDeleteProducts()" style="display:none;margin-left:8px">Delete Selected</button>
+            <label class="checkbox-label"><input type="checkbox" id="selectAllProducts" onchange="toggleSelectAll()"> {{ strings.select_all }}</label>
+            <button id="bulkPrintBtn" class="btn-small btn-primary" onclick="preparePrintFromProducts()" style="display:none;margin-left:8px">{{ strings.print_selected }}</button>
+            <button id="bulkDeleteBtn" class="btn-small btn-danger" onclick="bulkDeleteProducts()" style="display:none;margin-left:8px">{{ strings.delete_selected }}</button>
         </div>
         <div id="productsList">
             {% for product in products %}
@@ -19,12 +19,12 @@
                 <div class="product-checkbox"><input type="checkbox" class="product-checkbox-input" value="{{ product.id }}" onchange="updateBulkDeleteButton()"></div>
                 <div class="product-info">
                     <div class="product-name">{{ product.name }}</div>
-                    <div class="product-price">${{ "%.2f"|format(product.price) }}</div>
+                    <div class="product-price">{{ strings.currency }} {{ "%.2f"|format(product.price) }}</div>
                     <div class="product-actions">
-                        <button type="button" class="btn-small" onclick="addToCartFromList('{{ product.id }}')">Add to cart</button>
-                        <button type="button" class="btn-small btn-edit" onclick="openEditModal('{{ product.id }}', {{ product.name|tojson }}, {{ product.price }})">Edit</button>
+                        <button type="button" class="btn-small" onclick="addToCartFromList('{{ product.id }}')">{{ strings.add_to_cart }}</button>
+                        <button type="button" class="btn-small btn-edit" onclick="openEditModal('{{ product.id }}', {{ product.name|tojson }}, {{ product.price }})">{{ strings.edit }}</button>
                         {% if product.id not in ['1','2','3'] %}
-                        <button type="button" class="btn-small btn-danger" onclick="deleteProduct('{{ product.id }}', {{ product.name|tojson }})">Delete</button>
+                        <button type="button" class="btn-small btn-danger" onclick="deleteProduct('{{ product.id }}', {{ product.name|tojson }})">{{ strings.delete }}</button>
                         {% endif %}
                     </div>
                 </div>
@@ -33,21 +33,21 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="empty-text">No products yet. <a href="{{ url_for('create_product_page') }}">Create one</a>.</p>
+        <p class="empty-text">{{ strings.no_products }} <a href="{{ url_for('create_product_page') }}">{{ strings.create_one }}</a>.</p>
         {% endif %}
     </div>
 </div>
 
 <div id="editProductModal" class="modal">
     <div class="modal-content">
-        <div class="modal-header"><h2>Edit Product</h2><button type="button" class="close-btn" onclick="closeEditModal()">&times;</button></div>
+        <div class="modal-header"><h2>{{ strings.edit_product }}</h2><button type="button" class="close-btn" onclick="closeEditModal()">&times;</button></div>
         <form id="editProductForm" class="product-form">
             <input type="hidden" id="editProductId">
-            <label for="editProductName">Name</label><input type="text" id="editProductName" required>
-            <label for="editProductPrice">Price</label><input type="number" id="editProductPrice" step="0.01" min="0.01" required>
+            <label for="editProductName">{{ strings.name }}</label><input type="text" id="editProductName" required>
+            <label for="editProductPrice">{{ strings.price }}</label><input type="number" id="editProductPrice" step="0.01" min="0.01" required>
             <div style="display:flex;gap:12px;margin-top:16px">
-                <button type="submit" class="btn btn-primary">Save</button>
-                <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">{{ strings.save }}</button>
+                <button type="button" class="btn btn-outline" onclick="closeEditModal()">{{ strings.cancel }}</button>
             </div>
         </form>
     </div>
@@ -55,7 +55,7 @@
 
 <div id="printModal" class="modal">
     <div class="modal-content print-modal-content">
-        <div class="print-header"><h2>Print Preview</h2><div class="print-actions"><button type="button" class="btn btn-primary" onclick="window.print()">Print</button><button type="button" class="btn btn-outline" onclick="closePrintModal()">Close</button></div></div>
+        <div class="print-header"><h2>{{ strings.print_preview }}</h2><div class="print-actions"><button type="button" class="btn btn-primary" onclick="window.print()">{{ strings.print }}</button><button type="button" class="btn btn-outline" onclick="closePrintModal()">{{ strings.close }}</button></div></div>
         <div id="printContent" class="print-content"></div>
     </div>
 </div>

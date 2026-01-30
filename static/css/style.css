@@ -21,7 +21,14 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f4f4fb;color:#11
 .header-bar{display:flex;justify-content:flex-end;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px}
 .main-content{max-width:800px;margin:0 auto}
 .app-title{font-size:24px;font-weight:700;color:#111;margin:0}
-.user-info{display:flex;align-items:center;gap:10px}
+.user-info{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lang-link{font-size:13px;color:#6b7280;text-decoration:none;font-weight:500}
+.lang-link:hover{color:#4f46e5}
+.lang-sep{color:#d1d5db;margin:0 2px}
+.lang-switch{margin-top:8px;font-size:13px;color:#6b7280}
+.lang-switch a{color:#4f46e5;text-decoration:none}
+.lang-buttons{display:flex;flex-direction:column;gap:10px}
+.lang-btn{text-align:center}
 .username{font-size:14px;color:#666;font-weight:500}
 .logout-btn{background:#dc2626;color:#fff;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}
 .logout-btn:hover{background:#b91c1c}

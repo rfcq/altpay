@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AltPay</title>
+    <title>{{ strings.login_title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
 <body>
     <div class="auth-container">
         <div class="auth-card">
-            <h1 class="auth-title">AltPay Shop</h1>
-            <h2 class="auth-subtitle">Login</h2>
+            <h1 class="auth-title">{{ strings.app_name }}</h1>
+            <h2 class="auth-subtitle">{{ strings.login }}</h2>
             {% if use_ephemeral_db %}
-                <div class="flash-message flash-error" role="alert" style="margin-bottom:1rem">Data is not persistent on this deployment. Accounts may disappear between visits. Add <code>DATABASE_URL</code> for persistent storage (see VERCEL.md).</div>
+                <div class="flash-message flash-error" role="alert" style="margin-bottom:1rem">{{ strings.ephemeral_login }}</div>
             {% endif %}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -24,17 +24,18 @@
             {% endwith %}
             <form method="POST" action="{{ url_for('login') }}" class="auth-form">
                 <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" placeholder="Username" required autofocus>
+                    <label for="username">{{ strings.username }}</label>
+                    <input type="text" id="username" name="username" placeholder="{{ strings.username_placeholder }}" required autofocus>
                 </div>
                 <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" placeholder="Password" required>
+                    <label for="password">{{ strings.password }}</label>
+                    <input type="password" id="password" name="password" placeholder="{{ strings.password_placeholder }}" required>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Login</button>
+                <button type="submit" class="btn btn-primary btn-block">{{ strings.login }}</button>
             </form>
             <div class="auth-footer">
-                <p>Don't have an account? Contact an administrator to get one.</p>
+                <p>{{ strings.no_account }}</p>
+                <p class="lang-switch"><a href="{{ url_for('choose_language', next=url_for('login')) }}">{{ strings.lang_en }} / {{ strings.lang_pt_BR }}</a></p>
             </div>
         </div>
     </div>
