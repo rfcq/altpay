@@ -16,6 +16,8 @@ import json
 import uuid
 from datetime import datetime
 import os
+import urllib.request
+import urllib.parse
 
 from translations import TRANSLATIONS, SUPPORTED_LANGS, JS_KEYS
 
@@ -25,8 +27,34 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-product
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
+def _config_file_path():
+    base = '/tmp' if os.environ.get('VERCEL') else basedir
+    instance_dir = os.path.join(base, 'instance')
+    os.makedirs(instance_dir, exist_ok=True)
+    return os.path.join(instance_dir, 'config.json')
+
+
+def _read_config():
+    try:
+        path = _config_file_path()
+        if os.path.isfile(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _write_config(data):
+    path = _config_file_path()
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
+
 def _get_database_uri():
-    raw = (os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL') or '').strip()
+    raw = (_read_config().get('database_url') or '').strip()
+    if not raw:
+        raw = (os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL') or '').strip()
     if raw and ('postgresql://' in raw or 'postgres://' in raw):
         if raw.startswith('postgres://'):
             raw = raw.replace('postgres://', 'postgresql://', 1)
@@ -40,6 +68,22 @@ app.config['SQLALCHEMY_DATABASE_URI'] = _get_database_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+
+def _mask_database_uri(uri):
+    """Mask password in URI for display (postgresql://user:pass@host -> user:****@host)."""
+    if not uri or '://' not in uri:
+        return uri or ''
+    try:
+        scheme, rest = uri.split('://', 1)
+        if '@' in rest and (scheme == 'postgresql' or scheme == 'postgres'):
+            user_part, host_part = rest.rsplit('@', 1)
+            if ':' in user_part:
+                user, _ = user_part.split(':', 1)
+                return f'{scheme}://{user}:****@{host_part}'
+        return f'{scheme}://...'
+    except Exception:
+        return '...'
 
 
 def _is_ephemeral_db():
@@ -446,6 +490,133 @@ def users_page():
     return render_template('users.html', users=users_data, username=session.get('username'))
 
 
+@app.route('/config', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def config_page():
+    current_uri = app.config.get('SQLALCHEMY_DATABASE_URI') or ''
+    masked_uri = _mask_database_uri(current_uri)
+    config_data = _read_config()
+    saved_url = (config_data.get('database_url') or '').strip()
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        url = (data.get('database_url') or request.form.get('database_url') or '').strip()
+        if not url:
+            _write_config({})
+            flash(_t('config_saved_default'), 'success')
+            return redirect(url_for('config_page'))
+        if url.startswith('postgres://'):
+            url = url.replace('postgres://', 'postgresql://', 1)
+        if not ('postgresql://' in url or 'sqlite://' in url):
+            flash(_t('config_invalid_uri'), 'error')
+            return redirect(url_for('config_page'))
+        _write_config({'database_url': url})
+        flash(_t('config_saved_restart'), 'success')
+        return redirect(url_for('config_page'))
+    # Don't send raw postgres URL (may contain password) to client; only pre-fill sqlite
+    safe_saved_url = ''
+    if saved_url and saved_url.startswith('sqlite://'):
+        safe_saved_url = saved_url
+    return render_template(
+        'config.html',
+        username=session.get('username'),
+        current_uri_masked=masked_uri,
+        saved_database_url=safe_saved_url,
+    )
+
+
+@app.route('/config/erase-users', methods=['POST'])
+@login_required
+@admin_required
+def config_erase_users():
+    confirm = (request.form.get('confirm_erase') or (request.get_json(silent=True) or {}).get('confirm_erase') or '').strip()
+    if confirm != 'DELETE ALL':
+        flash(_t('config_erase_confirm_required'), 'error')
+        return redirect(url_for('config_page'))
+    try:
+        SaleItem.query.delete()
+        Sale.query.delete()
+        Product.query.delete()
+        User.query.delete()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception(e)
+        flash(_t('config_erase_error') + ' ' + str(e), 'error')
+        return redirect(url_for('config_page'))
+    session.clear()
+    flash(_t('config_erase_done'), 'success')
+    return redirect(url_for('login'))
+
+
+def _discogs_request(path, params=None):
+    """GET request to Discogs API. Uses DISCOGS_TOKEN or DISCOGS_KEY+SECRET. Returns parsed JSON or None."""
+    base = 'https://api.discogs.com'
+    url = base + path
+    if params:
+        url += '?' + urllib.parse.urlencode(params)
+    token = os.environ.get('DISCOGS_TOKEN', '').strip()
+    key = os.environ.get('DISCOGS_CONSUMER_KEY', '').strip()
+    secret = os.environ.get('DISCOGS_CONSUMER_SECRET', '').strip()
+    headers = {'User-Agent': 'AltPayShop/1.0 +https://github.com/altpay'}
+    if token:
+        headers['Authorization'] = f'Discogs token={token}'
+    elif key and secret:
+        headers['Authorization'] = f'Discogs key={key}, secret={secret}'
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        app.logger.warning('Discogs request failed: %s', e)
+        return None
+
+
+@app.route('/api/discogs/price-suggestions')
+@login_required
+def discogs_price_suggestions():
+    q = (request.args.get('q') or '').strip()
+    if not q or len(q) < 2:
+        return jsonify({'error': _t('discogs_query_too_short'), 'suggestions': []}), 400
+    if not (os.environ.get('DISCOGS_TOKEN') or (os.environ.get('DISCOGS_CONSUMER_KEY') and os.environ.get('DISCOGS_CONSUMER_SECRET'))):
+        return jsonify({'error': _t('discogs_not_configured'), 'suggestions': []}), 503
+    search = _discogs_request('/database/search', {'q': q, 'type': 'release', 'per_page': 8})
+    if not search or 'results' not in search:
+        return jsonify({'suggestions': []}), 200
+    suggestions = []
+    curr = (request.args.get('curr') or 'USD').upper()[:3]
+    for r in search.get('results', [])[:6]:
+        rid = r.get('id')
+        title = r.get('title', '')
+        if not rid:
+            continue
+        release = _discogs_request(f'/releases/{rid}', {'curr_abbr': curr})
+        if not release:
+            suggestions.append({'title': title, 'price': None, 'currency': curr, 'release_id': rid})
+            continue
+        low = release.get('lowest_price')
+        price = None
+        if low is not None:
+            if isinstance(low, dict) and 'value' in low:
+                try:
+                    price = float(low['value'])
+                except (TypeError, ValueError):
+                    pass
+            else:
+                try:
+                    price = float(low)
+                except (TypeError, ValueError):
+                    pass
+        curr_code = (release.get('lowest_price') or {}).get('currency') if isinstance(release.get('lowest_price'), dict) else release.get('currency', curr)
+        suggestions.append({
+            'title': title,
+            'price': round(price, 2) if price is not None else None,
+            'currency': curr_code or curr,
+            'release_id': rid,
+        })
+    return jsonify({'suggestions': suggestions}), 200
+
+
 @app.route('/api/products', methods=['POST'])
 @login_required
 def add_product():
@@ -457,7 +628,11 @@ def add_product():
         return jsonify({'error': _t('err_invalid_price')}), 400
     if not name or price <= 0:
         return jsonify({'error': _t('err_invalid_name_price')}), 400
-    product = Product(id=str(uuid.uuid4()), name=name, price=round(price, 2), user_id=session.get('user_id'))
+    user_id = session.get('user_id')
+    existing = Product.query.filter(Product.user_id == user_id).all()
+    if any(p.name.lower() == name.lower() for p in existing):
+        return jsonify({'error': _t('err_product_already_exists')}), 409
+    product = Product(id=str(uuid.uuid4()), name=name, price=round(price, 2), user_id=user_id)
     db.session.add(product)
     db.session.commit()
     return jsonify(product.to_dict()), 201
@@ -506,8 +681,10 @@ def import_products():
         if content.startswith('\ufeff'):
             content = content[1:]
         created = 0
+        skipped = 0
         errors = []
         user_id = session.get('user_id')
+        existing_names = {p.name.lower() for p in Product.query.filter(Product.user_id == user_id).all()}
         if fn.endswith('.csv'):
             for delimiter in (';', ','):
                 reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
@@ -525,8 +702,12 @@ def import_products():
                     if price is None:
                         errors.append(_t('import_row_invalid', row=i + 2))
                         continue
+                    if name.lower() in existing_names:
+                        skipped += 1
+                        continue
                     db.session.add(Product(id=str(uuid.uuid4()), name=name, price=price, user_id=user_id))
                     created += 1
+                    existing_names.add(name.lower())
                 break
         else:
             data = json.loads(content)
@@ -546,12 +727,18 @@ def import_products():
                 if price is None:
                     errors.append(_t('import_row_invalid', row=i + 1))
                     continue
+                if name.lower() in existing_names:
+                    skipped += 1
+                    continue
                 db.session.add(Product(id=str(uuid.uuid4()), name=name, price=price, user_id=user_id))
                 created += 1
+                existing_names.add(name.lower())
         db.session.commit()
+        msg = _t('import_success_skipped', created=created, skipped=skipped) if skipped else _t('import_success', count=created)
         return jsonify({
-            'message': _t('import_success', count=created),
+            'message': msg,
             'created': created,
+            'skipped': skipped,
             'errors': errors[:20],
         }), 200
     except json.JSONDecodeError as e:

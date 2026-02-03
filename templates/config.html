@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ strings.config_title }}{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="section-title">{{ strings.config }}</h2>
+        </div>
+        <p class="text-muted" style="margin-bottom:16px;font-size:14px;color:#6b7280">{{ strings.config_hint }}</p>
+
+        <section class="config-section" style="margin-bottom:24px">
+            <h3 class="config-subtitle" style="font-size:16px;margin-bottom:8px;color:#374151">{{ strings.config_database_connection }}</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:4px">{{ strings.config_current }}</p>
+            <code class="config-current-uri" style="display:block;padding:10px 12px;background:#f3f4f6;border-radius:6px;font-size:13px;word-break:break-all">{{ current_uri_masked or '—' }}</code>
+
+            <form method="post" action="{{ url_for('config_page') }}" class="product-form" style="margin-top:16px">
+                <label for="database_url">{{ strings.config_database_url }}</label>
+                <input type="text" id="database_url" name="database_url" class="config-input" placeholder="{{ strings.config_database_url_placeholder }}" value="{{ saved_database_url }}" style="width:100%;max-width:560px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:monospace">
+                <p class="text-muted" style="font-size:12px;margin-top:6px;color:#6b7280">{{ strings.config_database_url_hint }}</p>
+                <div style="margin-top:16px">
+                    <button type="submit" class="btn btn-primary">{{ strings.save }}</button>
+                    <a href="{{ url_for('config_page') }}" class="btn btn-outline" style="margin-left:8px">{{ strings.cancel }}</a>
+                </div>
+            </form>
+            <p class="text-muted" style="font-size:13px;margin-top:12px;color:#6b7280">{{ strings.config_restart_note }}</p>
+        </section>
+
+        <section class="config-section danger-zone" style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e7eb">
+            <h3 class="config-subtitle" style="font-size:16px;margin-bottom:8px;color:#b91c1c">{{ strings.config_danger_zone }}</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px;color:#6b7280">{{ strings.config_erase_users_hint }}</p>
+            <form method="post" action="{{ url_for('config_erase_users') }}" onsubmit="return confirmEraseAllUsers();" style="margin-top:12px">
+                <label for="confirm_erase" style="display:block;margin-bottom:6px;font-size:14px">{{ strings.config_erase_confirm_label }}</label>
+                <input type="text" id="confirm_erase" name="confirm_erase" placeholder="DELETE ALL" autocomplete="off" style="width:100%;max-width:280px;padding:8px 12px;border:1px solid #dc2626;border-radius:6px;font-size:14px;font-family:monospace">
+                <button type="submit" class="btn btn-danger" style="margin-top:12px">{{ strings.config_erase_users_btn }}</button>
+            </form>
+        </section>
+    </div>
+</div>
+<script>
+function confirmEraseAllUsers(){
+  var input = document.getElementById('confirm_erase');
+  if (!input || input.value.trim() !== 'DELETE ALL') return false;
+  return confirm({{ strings.config_erase_confirm_js|tojson }});
+}
+</script>
+{% endblock %}

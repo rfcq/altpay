@@ -8,8 +8,13 @@
             <label for="productName">{{ strings.name }}</label>
             <input type="text" id="productName" placeholder="{{ strings.name_placeholder }}" required>
             <label for="productPrice">{{ strings.price }}</label>
-            <input type="number" id="productPrice" step="0.01" min="0.01" placeholder="{{ strings.price_placeholder }}" required>
-            <button type="submit" class="btn btn-primary">{{ strings.add_product }}</button>
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+                <input type="number" id="productPrice" step="0.01" min="0.01" placeholder="{{ strings.price_placeholder }}" required style="flex:1;min-width:120px">
+                <button type="button" id="discogsSearchBtn" class="btn btn-outline" onclick="searchDiscogsPrice()">{{ strings.discogs_suggest_price }}</button>
+            </div>
+            <p id="discogsStatus" class="text-muted" style="font-size:13px;margin-top:6px;display:none"></p>
+            <div id="discogsResults" style="margin-top:10px;display:none"></div>
+            <button type="submit" class="btn btn-primary" style="margin-top:16px">{{ strings.add_product }}</button>
         </form>
     </div>
     <div class="card">
@@ -26,7 +31,69 @@
 {% endblock %}
 {% block scripts %}
 {{ super() }}
+<script>window.APP_CURRENCY = {{ (current_lang == 'pt-BR' and 'BRL' or 'USD')|tojson }};</script>
 <script>
+(function(){
+  window.searchDiscogsPrice = async function(){
+    var nameEl = document.getElementById('productName');
+    var priceEl = document.getElementById('productPrice');
+    var btn = document.getElementById('discogsSearchBtn');
+    var statusEl = document.getElementById('discogsStatus');
+    var resultsEl = document.getElementById('discogsResults');
+    var q = (nameEl && nameEl.value || '').trim();
+    if (!q) {
+      statusEl.style.display = 'block';
+      statusEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.discogs_enter_name) || 'Enter a product name first.';
+      statusEl.className = 'text-muted';
+      resultsEl.style.display = 'none';
+      return;
+    }
+    btn.disabled = true;
+    statusEl.style.display = 'block';
+    statusEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.discogs_searching) || 'Searching Discogs...';
+    statusEl.className = 'text-muted';
+    resultsEl.style.display = 'none';
+    resultsEl.innerHTML = '';
+    try {
+      var curr = (typeof window.APP_CURRENCY === 'string' && window.APP_CURRENCY) || 'USD';
+      var r = await fetch('/api/discogs/price-suggestions?q=' + encodeURIComponent(q) + '&curr=' + encodeURIComponent(curr));
+      var d = await r.json();
+      if (r.status === 503 || (d.error && d.error.indexOf('configured') !== -1)) {
+        statusEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.discogs_not_configured) || 'Discogs is not configured. Set DISCOGS_TOKEN or DISCOGS_CONSUMER_KEY/SECRET.';
+        statusEl.className = 'text-muted';
+      } else if (!r.ok) {
+        statusEl.textContent = d.error || (window.TRANSLATIONS && window.TRANSLATIONS.failed) || 'Request failed.';
+        statusEl.className = 'text-muted';
+      } else if (!d.suggestions || d.suggestions.length === 0) {
+        statusEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.discogs_no_results) || 'No results from Discogs.';
+        statusEl.className = 'text-muted';
+      } else {
+        statusEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.discogs_suggestions_from) || 'Price suggestions from Discogs:';
+        statusEl.className = 'text-muted';
+        var cur = (window.TRANSLATIONS && window.TRANSLATIONS.currency) || '$';
+        var html = '<ul class="discogs-list" style="list-style:none;padding:0;margin:0">';
+        d.suggestions.forEach(function(s){
+          var priceStr = s.price != null ? cur + ' ' + Number(s.price).toFixed(2) : ((window.TRANSLATIONS && window.TRANSLATIONS.discogs_no_price) || 'No price');
+          var useLabel = (window.TRANSLATIONS && window.TRANSLATIONS.discogs_use_price) || 'Use';
+          html += '<li style="padding:8px 0;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+          html += '<span style="flex:1;min-width:0">' + escapeHtml(s.title) + ' &mdash; ' + priceStr + '</span>';
+          if (s.price != null) {
+            html += '<button type="button" class="btn btn-small btn-primary" onclick="document.getElementById(\'productPrice\').value=' + s.price + '">' + useLabel + '</button>';
+          }
+          html += '</li>';
+        });
+        html += '</ul>';
+        resultsEl.innerHTML = html;
+        resultsEl.style.display = 'block';
+      }
+    } catch (err) {
+      statusEl.textContent = (window.TRANSLATIONS && window.TRANSLATIONS.failed) || 'Request failed.';
+      statusEl.className = 'text-muted';
+    }
+    btn.disabled = false;
+  };
+  function escapeHtml(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+})();
 (function(){
   var form = document.getElementById('importForm');
   if (!form) return;

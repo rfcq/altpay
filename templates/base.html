@@ -22,6 +22,7 @@
             <a href="{{ url_for('products_sold_page') }}" class="sidebar-link {% if request.endpoint == 'products_sold_page' %}active{% endif %}">{{ strings.products_sold }}</a>
             {% if is_admin %}
             <a href="{{ url_for('users_page') }}" class="sidebar-link {% if request.endpoint == 'users_page' %}active{% endif %}">{{ strings.nav_users }}</a>
+            <a href="{{ url_for('config_page') }}" class="sidebar-link {% if request.endpoint == 'config_page' %}active{% endif %}">{{ strings.nav_config }}</a>
             {% endif %}
         </nav>
     </aside>

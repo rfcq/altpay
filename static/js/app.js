@@ -77,11 +77,31 @@ async function deleteProduct(productId,productName){
   }catch(e){alert(t('failed'));}
 }
 
+function filterProductList(){
+  const q=((document.getElementById('productSearch')||{}).value||'').trim().toLowerCase();
+  const noResultsEl=document.getElementById('productsNoResults');
+  const rows=document.querySelectorAll('#productsList .product-row');
+  let visible=0;
+  rows.forEach(row=>{
+    const name=(row.querySelector('.product-name')||{}).textContent||'';
+    const match=!q||name.toLowerCase().includes(q);
+    row.style.display=match?'':'none';
+    if(match)visible++;
+  });
+  if(noResultsEl)noResultsEl.style.display=visible===0&&rows.length>0?'block':'none';
+  const sel=document.getElementById('selectAllProducts');
+  if(sel){ const visibleInputs=Array.from(rows).filter(r=>r.style.display!=='none').map(r=>r.querySelector('.product-checkbox-input')).filter(Boolean); sel.checked=visibleInputs.length>0&&visibleInputs.every(cb=>cb.checked); }
+  updateBulkDeleteButton();
+}
 function toggleSelectAll(){
   var sel=document.getElementById('selectAllProducts');
   if(!sel)return;
   const all=sel.checked;
-  document.querySelectorAll('.product-checkbox-input').forEach(cb=>cb.checked=all);
+  document.querySelectorAll('#productsList .product-row').forEach(row=>{
+    if(row.style.display==='none')return;
+    const cb=row.querySelector('.product-checkbox-input');
+    if(cb)cb.checked=all;
+  });
   updateBulkDeleteButton();
 }
 function updateBulkDeleteButton(){
