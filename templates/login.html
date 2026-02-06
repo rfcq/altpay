@@ -22,7 +22,7 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-            <form method="POST" action="{{ url_for('login') }}" class="auth-form">
+            <form method="POST" action="{{ url_for('auth.login') }}" class="auth-form">
                 <div class="form-group">
                     <label for="username">{{ strings.username }}</label>
                     <input type="text" id="username" name="username" placeholder="{{ strings.username_placeholder }}" required autofocus>
@@ -35,7 +35,7 @@
             </form>
             <div class="auth-footer">
                 <p>{{ strings.no_account }}</p>
-                <p class="lang-switch"><a href="{{ url_for('choose_language', next=url_for('login')) }}">{{ strings.lang_en }} / {{ strings.lang_pt_BR }}</a></p>
+                <p class="lang-switch"><a href="{{ url_for('main.choose_language', next=url_for('auth.login')) }}">{{ strings.lang_en }} / {{ strings.lang_pt_BR }}</a></p>
             </div>
         </div>
     </div>

@@ -26,7 +26,7 @@
         </div>
         {% else %}
         <p class="empty-text">{{ strings.products_sold_empty }}</p>
-        <p class="empty-text"><a href="{{ url_for('cart_page') }}">{{ strings.nav_cart }}</a></p>
+        <p class="empty-text"><a href="{{ url_for('pages.cart_page') }}">{{ strings.nav_cart }}</a></p>
         {% endif %}
     </div>
 </div>

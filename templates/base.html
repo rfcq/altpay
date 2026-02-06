@@ -16,24 +16,24 @@
             <h1 class="sidebar-title">{{ strings.app_name }}</h1>
         </div>
         <nav class="sidebar-nav">
-            <a href="{{ url_for('create_product_page') }}" class="sidebar-link {% if request.endpoint == 'create_product_page' %}active{% endif %}">{{ strings.nav_create_product }}</a>
-            <a href="{{ url_for('products') }}" class="sidebar-link {% if request.endpoint == 'products' %}active{% endif %}">{{ strings.nav_products }}</a>
-            <a href="{{ url_for('cart_page') }}" class="sidebar-link {% if request.endpoint == 'cart_page' %}active{% endif %}">{{ strings.nav_cart }}</a>
-            <a href="{{ url_for('products_sold_page') }}" class="sidebar-link {% if request.endpoint == 'products_sold_page' %}active{% endif %}">{{ strings.products_sold }}</a>
+            <a href="{{ url_for('pages.create_product_page') }}" class="sidebar-link {% if request.endpoint == 'pages.create_product_page' %}active{% endif %}">{{ strings.nav_create_product }}</a>
+            <a href="{{ url_for('pages.products') }}" class="sidebar-link {% if request.endpoint == 'pages.products' %}active{% endif %}">{{ strings.nav_products }}</a>
+            <a href="{{ url_for('pages.cart_page') }}" class="sidebar-link {% if request.endpoint == 'pages.cart_page' %}active{% endif %}">{{ strings.nav_cart }}</a>
+            <a href="{{ url_for('pages.products_sold_page') }}" class="sidebar-link {% if request.endpoint == 'pages.products_sold_page' %}active{% endif %}">{{ strings.products_sold }}</a>
             {% if is_admin %}
-            <a href="{{ url_for('users_page') }}" class="sidebar-link {% if request.endpoint == 'users_page' %}active{% endif %}">{{ strings.nav_users }}</a>
-            <a href="{{ url_for('config_page') }}" class="sidebar-link {% if request.endpoint == 'config_page' %}active{% endif %}">{{ strings.nav_config }}</a>
+            <a href="{{ url_for('pages.users_page') }}" class="sidebar-link {% if request.endpoint == 'pages.users_page' %}active{% endif %}">{{ strings.nav_users }}</a>
+            <a href="{{ url_for('config.config_page') }}" class="sidebar-link {% if request.endpoint == 'config.config_page' %}active{% endif %}">{{ strings.nav_config }}</a>
             {% endif %}
         </nav>
     </aside>
     <div class="main-wrap">
         <header class="header-bar">
             <div class="user-info">
-                <a href="{{ url_for('choose_language', lang='en', next=request.url) }}" class="lang-link" title="English">EN</a>
+                <a href="{{ url_for('main.choose_language', lang='en', next=request.url) }}" class="lang-link" title="English">EN</a>
                 <span class="lang-sep">|</span>
-                <a href="{{ url_for('choose_language', lang='pt-BR', next=request.url) }}" class="lang-link" title="Português">PT</a>
+                <a href="{{ url_for('main.choose_language', lang='pt-BR', next=request.url) }}" class="lang-link" title="Português">PT</a>
                 <span class="username">{{ strings.welcome.replace('{username}', username) }}</span>
-                <a href="{{ url_for('logout') }}" class="btn btn-small logout-btn">{{ strings.logout }}</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-small logout-btn">{{ strings.logout }}</a>
             </div>
         </header>
         <main class="main-content">

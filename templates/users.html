@@ -5,7 +5,7 @@
     <div class="card">
         <div class="card-header">
             <h2 class="section-title">{{ strings.users }}</h2>
-            <a href="{{ url_for('register') }}" class="btn btn-primary">{{ strings.add_user }}</a>
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary">{{ strings.add_user }}</a>
         </div>
         <p class="text-muted" style="margin-bottom:12px;font-size:14px;color:#6b7280">{{ strings.users_hint }}</p>
         {% if users %}
@@ -30,7 +30,7 @@
             </table>
         </div>
         {% else %}
-        <p class="empty-text">{{ strings.no_users }} <a href="{{ url_for('register') }}">{{ strings.add_first_user }}</a>.</p>
+        <p class="empty-text">{{ strings.no_users }} <a href="{{ url_for('auth.register') }}">{{ strings.add_first_user }}</a>.</p>
         {% endif %}
     </div>
 </div>

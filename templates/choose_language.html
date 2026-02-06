@@ -14,8 +14,8 @@
             <h2 class="auth-subtitle">{{ strings.choose_language }}</h2>
             <p class="text-muted" style="margin-bottom:1.5rem;font-size:14px;color:#6b7280">{{ strings.choose_language_subtitle }}</p>
             <div class="lang-buttons">
-                <a href="{{ url_for('choose_language', lang='en', next=next_url) }}" class="btn btn-primary btn-block lang-btn">{{ strings.lang_en }}</a>
-                <a href="{{ url_for('choose_language', lang='pt-BR', next=next_url) }}" class="btn btn-outline btn-block lang-btn">{{ strings.lang_pt_BR }}</a>
+                <a href="{{ url_for('main.choose_language', lang='en', next=next_url) }}" class="btn btn-primary btn-block lang-btn">{{ strings.lang_en }}</a>
+                <a href="{{ url_for('main.choose_language', lang='pt-BR', next=next_url) }}" class="btn btn-outline btn-block lang-btn">{{ strings.lang_pt_BR }}</a>
             </div>
         </div>
     </div>

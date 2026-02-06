@@ -15,9 +15,27 @@ if(productForm){
   productForm.addEventListener('submit',async function(e){
     e.preventDefault();
     const name=document.getElementById('productName').value.trim(),price=parseFloat(document.getElementById('productPrice').value);
+    const gradingEl=document.getElementById('productGrading'),publisherEl=document.getElementById('productPublisher'),yearEl=document.getElementById('productYear'),coverEl=document.getElementById('productCover');
+    const grading=gradingEl?gradingEl.value.trim():'';
+    const publisher=publisherEl?publisherEl.value.trim():'';
+    const year=yearEl&&yearEl.value?parseInt(yearEl.value,10):'';
+    const coverFile=coverEl&&coverEl.files&&coverEl.files[0];
     if(!name||isNaN(price)||price<=0){alert(t('enter_valid_name_price'));return;}
     try{
-      const r=await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
+      let r;
+      if(coverFile){
+        const fd=new FormData();
+        fd.append('name',name);fd.append('price',String(price));
+        if(grading)fd.append('grading',grading);if(publisher)fd.append('publisher',publisher);
+        if(year&&!isNaN(year))fd.append('year',String(year));
+        fd.append('cover',coverFile);
+        r=await fetch('/api/products',{method:'POST',body:fd});
+      }else{
+        const body={name,price};
+        if(grading)body.grading=grading;if(publisher)body.publisher=publisher;
+        if(year&&!isNaN(year))body.year=year;
+        r=await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      }
       if(r.ok)window.location.href='/products';else{const d=await r.json();alert(d.error||t('failed'));}
     }catch(err){alert(t('failed'));}
     this.reset();
@@ -48,9 +66,16 @@ async function finishBuy(){
   }catch(e){alert(t('failed'));}
 }
 
-function openEditModal(id,name,price){
+function openEditModal(id,name,price,grading,publisher,year){
   var m=document.getElementById('editProductModal'),f=document.getElementById('editProductForm');
-  if(m&&f){document.getElementById('editProductId').value=id;document.getElementById('editProductName').value=name;document.getElementById('editProductPrice').value=price;m.classList.add('active');}
+  if(m&&f){
+    document.getElementById('editProductId').value=id;
+    document.getElementById('editProductName').value=name||'';
+    document.getElementById('editProductPrice').value=price;
+    var gEl=document.getElementById('editProductGrading'),pEl=document.getElementById('editProductPublisher'),yEl=document.getElementById('editProductYear'),cEl=document.getElementById('editProductCover');
+    if(gEl)gEl.value=grading||'';if(pEl)pEl.value=publisher||'';if(yEl)yEl.value=year!=null&&year!==''?year:'';if(cEl)cEl.value='';
+    m.classList.add('active');
+  }
 }
 function closeEditModal(){
   var m=document.getElementById('editProductModal'),f=document.getElementById('editProductForm');
@@ -61,9 +86,25 @@ if(editProductForm){
   editProductForm.addEventListener('submit',async function(e){
     e.preventDefault();
     const id=document.getElementById('editProductId').value,name=document.getElementById('editProductName').value.trim(),price=parseFloat(document.getElementById('editProductPrice').value);
+    const gEl=document.getElementById('editProductGrading'),pEl=document.getElementById('editProductPublisher'),yEl=document.getElementById('editProductYear'),coverEl=document.getElementById('editProductCover');
+    const grading=gEl?gEl.value.trim():'',publisher=pEl?pEl.value.trim():'',yearVal=yEl&&yEl.value?parseInt(yEl.value,10):null;
+    const coverFile=coverEl&&coverEl.files&&coverEl.files[0];
     if(!name||isNaN(price)||price<=0){alert(t('invalid'));return;}
     try{
-      const r=await fetch('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})});
+      let r;
+      if(coverFile){
+        const fd=new FormData();
+        fd.append('name',name);fd.append('price',String(price));
+        if(grading)fd.append('grading',grading);if(publisher)fd.append('publisher',publisher);
+        if(yearVal&&!isNaN(yearVal))fd.append('year',String(yearVal));
+        fd.append('cover',coverFile);
+        r=await fetch('/api/products/'+id,{method:'PUT',body:fd});
+      }else{
+        const body={name,price};
+        if(grading)body.grading=grading;if(publisher)body.publisher=publisher;
+        if(yearVal&&!isNaN(yearVal))body.year=yearVal;
+        r=await fetch('/api/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      }
       if(r.ok){closeEditModal();location.reload();}else{alert((await r.json()).error||t('failed'));}
     }catch(e){alert(t('failed'));}
   });

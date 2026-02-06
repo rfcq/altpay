@@ -18,7 +18,7 @@
             <button type="button" class="btn btn-outline" onclick="preparePrintFromCart()" style="margin-top:8px">{{ strings.print_cart }}</button>
             <button type="button" class="btn btn-danger" onclick="clearCart()" style="margin-top:8px">{{ strings.clear_cart }}</button>
             {% else %}
-            <p class="empty-text">{{ strings.cart_empty }} <a href="{{ url_for('products') }}">{{ strings.nav_products }}</a>.</p>
+            <p class="empty-text">{{ strings.cart_empty }} <a href="{{ url_for('pages.products') }}">{{ strings.nav_products }}</a>.</p>
             {% endif %}
         </div>
     </div>

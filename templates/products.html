@@ -21,20 +21,32 @@
             <div class="product-row" data-product-id="{{ product.id }}">
                 <div class="product-checkbox"><input type="checkbox" class="product-checkbox-input" value="{{ product.id }}" onchange="updateBulkDeleteButton()"></div>
                 <div class="product-info">
-                    <div class="product-name">{{ product.name }}</div>
-                    <div class="product-price">{{ strings.currency }} {{ "%.2f"|format(product.price) }}</div>
-                    <div class="product-actions">
-                        <button type="button" class="btn-small" onclick="addToCartFromList('{{ product.id }}')">{{ strings.add_to_cart }}</button>
-                        <button type="button" class="btn-small btn-edit" onclick="openEditModal('{{ product.id }}', {{ product.name|tojson }}, {{ product.price }})">{{ strings.edit }}</button>
-                        <button type="button" class="btn-small btn-danger" onclick='deleteProduct({{ product.id|tojson }}, {{ product.name|tojson }})'>{{ strings.delete }}</button>
+                    {% if product.cover_path %}
+                    <div class="product-cover-thumb"><img src="{{ url_for('static', filename=product.cover_path) }}" alt="" class="product-cover-img"></div>
+                    {% endif %}
+                    <div class="product-details">
+                        <div class="product-name">{{ product.name }}</div>
+                        <div class="product-price">{{ strings.currency }} {{ "%.2f"|format(product.price) }}</div>
+                        {% if product.grading or product.publisher or product.year %}
+                        <div class="product-meta text-muted" style="font-size:12px;margin-top:4px">
+                            {% if product.grading %}<span>{{ product.grading }}</span>{% endif %}
+                            {% if product.publisher %}<span>{% if product.grading %} · {% endif %}{{ product.publisher }}</span>{% endif %}
+                            {% if product.year %}<span>{% if product.grading or product.publisher %} · {% endif %}{{ product.year }}</span>{% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="product-actions">
+                            <button type="button" class="btn-small" onclick="addToCartFromList('{{ product.id }}')">{{ strings.add_to_cart }}</button>
+                            <button type="button" class="btn-small btn-edit" onclick="openEditModal('{{ product.id }}', {{ product.name|tojson }}, {{ product.price }}, {{ (product.grading or '')|tojson }}, {{ (product.publisher or '')|tojson }}, {{ product.year if product.year is not none else 'null' }})">{{ strings.edit }}</button>
+                            <button type="button" class="btn-small btn-danger" onclick='deleteProduct({{ product.id|tojson }}, {{ product.name|tojson }})'>{{ strings.delete }}</button>
+                        </div>
                     </div>
                 </div>
-                <div class="qr-container"><img src="{{ url_for('get_product_qr', product_id=product.id) }}" alt="QR" class="qr-image"></div>
+                <div class="qr-container"><img src="{{ url_for('api_products.get_product_qr', product_id=product.id) }}" alt="QR" class="qr-image"></div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <p class="empty-text">{{ strings.no_products }} <a href="{{ url_for('create_product_page') }}">{{ strings.create_one }}</a>.</p>
+        <p class="empty-text">{{ strings.no_products }} <a href="{{ url_for('pages.create_product_page') }}">{{ strings.create_one }}</a>.</p>
         {% endif %}
     </div>
 </div>
@@ -46,6 +58,11 @@
             <input type="hidden" id="editProductId">
             <label for="editProductName">{{ strings.name }}</label><input type="text" id="editProductName" required>
             <label for="editProductPrice">{{ strings.price }}</label><input type="number" id="editProductPrice" step="0.01" min="0.01" required>
+            <label for="editProductGrading" style="display:block;margin-top:12px">{{ strings.grading }}</label><input type="text" id="editProductGrading" placeholder="{{ strings.grading_placeholder }}">
+            <label for="editProductPublisher" style="display:block;margin-top:8px">{{ strings.publisher }}</label><input type="text" id="editProductPublisher" placeholder="{{ strings.publisher_placeholder }}">
+            <label for="editProductYear" style="display:block;margin-top:8px">{{ strings.year }}</label><input type="number" id="editProductYear" min="1900" max="2100" step="1" placeholder="{{ strings.year_placeholder }}">
+            <label for="editProductCover" style="display:block;margin-top:8px">{{ strings.cover }}</label><input type="file" id="editProductCover" name="cover" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+            <p class="text-muted" style="font-size:12px;margin-top:4px">{{ strings.cover_hint_optional }}</p>
             <div style="display:flex;gap:12px;margin-top:16px">
                 <button type="submit" class="btn btn-primary">{{ strings.save }}</button>
                 <button type="button" class="btn btn-outline" onclick="closeEditModal()">{{ strings.cancel }}</button>

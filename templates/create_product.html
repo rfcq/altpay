@@ -14,6 +14,15 @@
             </div>
             <p id="discogsStatus" class="text-muted" style="font-size:13px;margin-top:6px;display:none"></p>
             <div id="discogsResults" style="margin-top:10px;display:none"></div>
+            <label for="productGrading" style="display:block;margin-top:16px">{{ strings.grading }}</label>
+            <input type="text" id="productGrading" placeholder="{{ strings.grading_placeholder }}" style="width:100%;max-width:320px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px">
+            <label for="productPublisher" style="display:block;margin-top:12px">{{ strings.publisher }}</label>
+            <input type="text" id="productPublisher" placeholder="{{ strings.publisher_placeholder }}" style="width:100%;max-width:320px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px">
+            <label for="productYear" style="display:block;margin-top:12px">{{ strings.year }}</label>
+            <input type="number" id="productYear" min="1900" max="2100" step="1" placeholder="{{ strings.year_placeholder }}" style="width:100%;max-width:120px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px">
+            <label for="productCover" style="display:block;margin-top:12px">{{ strings.cover }}</label>
+            <input type="file" id="productCover" name="cover" accept=".jpg,.jpeg,.png,image/jpeg,image/png" style="width:100%;max-width:320px;padding:8px 0;font-size:14px">
+            <p class="text-muted" style="font-size:12px;margin-top:4px;color:#6b7280">{{ strings.cover_hint }}</p>
             <button type="submit" class="btn btn-primary" style="margin-top:16px">{{ strings.add_product }}</button>
         </form>
     </div>

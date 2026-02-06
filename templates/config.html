@@ -13,22 +13,47 @@
             <p class="text-muted" style="font-size:13px;margin-bottom:4px">{{ strings.config_current }}</p>
             <code class="config-current-uri" style="display:block;padding:10px 12px;background:#f3f4f6;border-radius:6px;font-size:13px;word-break:break-all">{{ current_uri_masked or '—' }}</code>
 
-            <form method="post" action="{{ url_for('config_page') }}" class="product-form" style="margin-top:16px">
+            <form method="post" action="{{ url_for('config.config_page') }}" class="product-form" style="margin-top:16px">
                 <label for="database_url">{{ strings.config_database_url }}</label>
                 <input type="text" id="database_url" name="database_url" class="config-input" placeholder="{{ strings.config_database_url_placeholder }}" value="{{ saved_database_url }}" style="width:100%;max-width:560px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:monospace">
                 <p class="text-muted" style="font-size:12px;margin-top:6px;color:#6b7280">{{ strings.config_database_url_hint }}</p>
                 <div style="margin-top:16px">
                     <button type="submit" class="btn btn-primary">{{ strings.save }}</button>
-                    <a href="{{ url_for('config_page') }}" class="btn btn-outline" style="margin-left:8px">{{ strings.cancel }}</a>
+                    <a href="{{ url_for('config.config_page') }}" class="btn btn-outline" style="margin-left:8px">{{ strings.cancel }}</a>
                 </div>
             </form>
             <p class="text-muted" style="font-size:13px;margin-top:12px;color:#6b7280">{{ strings.config_restart_note }}</p>
         </section>
 
+        <section class="config-section" style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e7eb">
+            <h3 class="config-subtitle" style="font-size:16px;margin-bottom:8px;color:#374151">{{ strings.config_discogs_section }}</h3>
+            <p class="text-muted" style="font-size:13px;margin-bottom:4px">{{ strings.config_discogs_hint }}</p>
+            {% if discogs_configured %}
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px;color:#059669">{{ strings.config_discogs_status_configured }}</p>
+            {% else %}
+            <p class="text-muted" style="font-size:13px;margin-bottom:12px;color:#6b7280">{{ strings.config_discogs_status_not_configured }}</p>
+            {% endif %}
+            <form method="post" action="{{ url_for('config.config_page') }}" class="product-form" style="margin-top:16px">
+                <input type="hidden" name="section" value="discogs">
+                <label for="discogs_token">{{ strings.config_discogs_token }}</label>
+                <input type="password" id="discogs_token" name="discogs_token" class="config-input" placeholder="{{ discogs_token_placeholder or strings.config_discogs_token_placeholder }}" autocomplete="off" style="width:100%;max-width:560px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:monospace">
+                <p class="text-muted" style="font-size:12px;margin-top:4px;color:#6b7280">{{ strings.config_discogs_token_hint }}</p>
+                <label for="discogs_consumer_key" style="display:block;margin-top:16px">{{ strings.config_discogs_consumer_key }}</label>
+                <input type="text" id="discogs_consumer_key" name="discogs_consumer_key" class="config-input" placeholder="{{ discogs_key_placeholder or strings.config_discogs_consumer_key_placeholder }}" autocomplete="off" style="width:100%;max-width:560px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:monospace">
+                <label for="discogs_consumer_secret" style="display:block;margin-top:8px">{{ strings.config_discogs_consumer_secret }}</label>
+                <input type="password" id="discogs_consumer_secret" name="discogs_consumer_secret" class="config-input" placeholder="{{ strings.config_discogs_consumer_secret_placeholder }}" autocomplete="off" style="width:100%;max-width:560px;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:monospace">
+                <p class="text-muted" style="font-size:12px;margin-top:6px;color:#6b7280">{{ strings.config_discogs_key_secret_hint }}</p>
+                <div style="margin-top:16px">
+                    <button type="submit" class="btn btn-primary">{{ strings.save }}</button>
+                    <a href="{{ url_for('config.config_page') }}" class="btn btn-outline" style="margin-left:8px">{{ strings.cancel }}</a>
+                </div>
+            </form>
+        </section>
+
         <section class="config-section danger-zone" style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e7eb">
             <h3 class="config-subtitle" style="font-size:16px;margin-bottom:8px;color:#b91c1c">{{ strings.config_danger_zone }}</h3>
             <p class="text-muted" style="font-size:13px;margin-bottom:12px;color:#6b7280">{{ strings.config_erase_users_hint }}</p>
-            <form method="post" action="{{ url_for('config_erase_users') }}" onsubmit="return confirmEraseAllUsers();" style="margin-top:12px">
+            <form method="post" action="{{ url_for('config.config_erase_users') }}" onsubmit="return confirmEraseAllUsers();" style="margin-top:12px">
                 <label for="confirm_erase" style="display:block;margin-bottom:6px;font-size:14px">{{ strings.config_erase_confirm_label }}</label>
                 <input type="text" id="confirm_erase" name="confirm_erase" placeholder="DELETE ALL" autocomplete="off" style="width:100%;max-width:280px;padding:8px 12px;border:1px solid #dc2626;border-radius:6px;font-size:14px;font-family:monospace">
                 <button type="submit" class="btn btn-danger" style="margin-top:12px">{{ strings.config_erase_users_btn }}</button>

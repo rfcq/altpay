@@ -1,6 +1,13 @@
 # AltPay Shop
 
-Flask web app for product management, QR codes, and shopping cart. Supports login, roles (admin/user), multilanguage (EN / pt-BR), and optional Discogs price suggestions.
+Flask web app for product management, QR codes, and shopping cart. The project is organized using **MVC** (Model–View–Controller).
+
+- **Models** (`models/`): `User`, `Product`, `Sale`, `SaleItem`; DB init/migrations.
+- **Views**: Jinja2 templates in `templates/`.
+- **Controllers** (`controllers/`): Flask blueprints – `main` (index, language), `auth` (login/register), `pages` (create/product/cart/users/products-sold), `config` (settings, erase users), `api_products`, `api_cart`, `api_discogs`.
+- **Config** (`config.py`): Paths, database URI, config file.
+- **Utils** (`utils/`): Encryption, auth hashing, i18n (`t()`).
+- **Extensions** (`extensions.py`): `db` (SQLAlchemy), initialized in `app.py`. Supports login, roles (admin/user), multilanguage (EN / pt-BR), and optional Discogs price suggestions.
 
 ## Features
 
